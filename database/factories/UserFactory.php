@@ -1,0 +1,42 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Helpers\Qs;
+use App\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+class UserFactory extends Factory
+{
+/**
+* The name of the factory's corresponding model.
+*
+* @var string
+*/
+    protected $model = User::class;
+
+/**
+* Define the model's default state.
+*
+* @return array
+*/
+    public function definition()
+    {
+        // Use Qs helper to get staff roles - this ensures consistency with role names in Qs.php
+        // Excluding super_admin and librarian from random selection
+        $staffRoles = Qs::getStaffRoles(['super_admin', 'librarian']);
+        $user_type = $staffRoles[rand(0, count($staffRoles) - 1)];
+
+        return [
+            'name' => $this->faker->name,
+            'email' => $this->faker->safeEmail,
+            'username' => $this->faker->userName,
+            'password' => Hash::make($user_type),
+            'user_type' => $user_type, // Using consistent role name from Qs.php
+            'code' => strtoupper(Str::random(10)),
+            'remember_token' => Str::random(10),
+        ];
+    }
+}

@@ -1,0 +1,1 @@
+@include('livewire.timetable.partials.timetable-records') 

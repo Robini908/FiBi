@@ -1,0 +1,59 @@
+@extends('layouts.login_master')
+
+@section('content')
+<div class="container mt-5 mb-4">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-header">
+                    <h4>Silver Plan</h4>
+                </div>
+                <div class="card-body">
+                    <h2 class="card-title pricing-card-title">Kshs 150,000 <small class="text-muted">/ year</small></h2>
+                    <ul class="list-unstyled mt-3 mb-4">
+                        <li>Registration</li>
+                        <li>Exams</li>
+                        <li>Finance(Basic)</li>
+                        <li>Support Email</li>
+                    </ul>
+                    <button type="button" class="btn btn-lg btn-block blogin">Buy</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-header">
+                    <h4>Bronze Plan</h4>
+                </div>
+                <div class="card-body">
+                    <h2 class="card-title pricing-card-title">Kshs 250,000 <small class="text-muted">/ year</small></h2>
+                    <ul class="list-unstyled mt-3 mb-4">
+                        <li>All in Silver</li>
+                        <li>Finance(Advanced)</li>
+                        <li>Human Resource</li>
+                        <li>Support Email & Phone</li>
+                    </ul>
+                    <button type="button" class="btn btn-lg btn-block blogin">Buy</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-header">
+                    <h4>Gold Plan</h4>
+                </div>
+                <div class="card-body">
+                    <h2 class="card-title pricing-card-title">Kshs 400,000 <small class="text-muted">/ year</small></h2>
+                    <ul class="list-unstyled mt-3 mb-4">
+                        <li>All in Bronze</li>
+                        <li>Library</li>
+                        <li>Plus More</li>
+                        <li>Premium Support</li>
+                    </ul>
+                    <button type="button" class="btn btn-lg btn-block blogin">Buy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection 

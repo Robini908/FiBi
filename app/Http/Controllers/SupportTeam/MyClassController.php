@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Http\Controllers\SupportTeam;
+
+use App\Helpers\Qs;
+use App\Models\MyClass;
+use Illuminate\Http\Request;
+use App\Repositories\UserRepo;
+use App\Repositories\MyClassRepo;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\MyClass\ClassCreate;
+use App\Http\Requests\MyClass\ClassUpdate;
+
+class MyClassController extends Controller
+{
+    protected $my_class, $user;
+
+    public function __construct(MyClassRepo $my_class, UserRepo $user)
+    {
+        $this->middleware('teamSA', ['except' => ['destroy',] ]);
+        $this->middleware('super_admin', ['only' => ['destroy',] ]);
+
+        $this->my_class = $my_class;
+        $this->user = $user;
+    }
+
+    public function index() 
+    {
+        $d['my_classes'] = $this->my_class->all();
+
+        /* $d['teachers'] = $this->user->getUserByType('teacher'); */
+        /* $d['class_types'] = $this->my_class->getTypes(); */
+       
+        /* $d['teachers'] = $this->user->getUserByType('teacher'); */
+        $d['users'] = $this->user->getAll();
+
+        $d['teachers'] = $this->user->getUserByType('teacher');
+        $d['teacherids'] = $this->user->getTeacherIds();
+        
+       
+        
+
+        return view('pages.support_team.classes.index', $d); 
+    }
+
+    public function store(ClassCreate $req)
+    {
+        $data = $req->all();
+        $data['session'] = $req->input('year_admitted');
+        
+        $mc = $this->my_class->create($data);
+
+       
+
+        // Create Default Section
+        $s =['my_class_id' => $mc->id,
+            'name' => 'A',
+            'active' => 1,
+            'teacher_id' => NULL,
+        ];
+
+        $this->my_class->createSection($s);
+
+        return Qs::jsonStoreOk();
+    }
+
+    public function edit($id)
+    {
+        /* $d['s'] = $s = $this->my_class->findSection($id);
+        $d['teachers'] = $this->user->getUserByType('teacher'); */
+        $d['teachers'] = $this->user->getUserByType('teacher');
+        $d['c'] = $c = $this->my_class->find($id);
+
+        return is_null($c) ? Qs::goWithDanger('classes.index') : view('pages.support_team.classes.edit', $d) ;
+    }
+
+    public function update(Request $req, $id)
+    {
+
+        $class = MyClass::findorFail($id);
+
+        
+        
+        $class->user_id = Qs::unhash($req-> input('teacher_id'));
+        $class->name = $req-> input('name');
+        
+       
+        $class->save();
+        /* $data = $req->only(['name','teacher_id']);
+        $this->my_class->update($id, $data); */
+        return redirect()->route('classes.index')->with('success', 'Record Updated Successfully');
+         /* return Qs::jsonUpdateOk(); */
+    }
+       
+
+
+    public function destroy($id)
+    {
+        $this->my_class->delete($id);
+        return back()->with('flash_success', __('msg.del_ok'));
+    }
+
+}

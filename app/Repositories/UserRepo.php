@@ -1,0 +1,86 @@
+<?php
+
+namespace App\Repositories;
+
+use App\Models\BloodGroup;
+use App\Models\StaffRecord;
+use App\User;
+use Spatie\Permission\Models\Role;
+
+class UserRepo {
+
+    public function update($id, $data)
+    {
+        return User::find($id)->update($data);
+    }
+
+    public function delete($id)
+    {
+        return User::destroy($id);
+    }
+
+    public function create($data)
+    {
+        return User::create($data);
+    }
+
+    public function getUserByType($type)
+    {
+        return User::role($type)->orderBy('name', 'asc')->get();
+    }
+
+    public function getTeacherIds()
+    {
+        return User::role('teacher')->pluck('id')->toArray();
+    }
+
+    public function getAllTypes()
+    {
+        return Role::all();
+    }
+
+    public function findType($id)
+    {
+        return Role::find($id);
+    }
+
+    public function find($id)
+    {
+        return User::find($id);
+    }
+
+    public function getAll()
+    {
+        return User::orderBy('name', 'asc')->get();
+    }
+
+    public function getPTAUsers()
+    {
+        return User::whereHas('roles', function($q) {
+            $q->whereNotIn('name', ['student']);
+        })->orderBy('name', 'asc')->get();
+    }
+
+    /********** STAFF RECORD ********/
+    public function createStaffRecord($data)
+    {
+        return StaffRecord::create($data);
+    }
+
+    public function updateStaffRecord($where, $data)
+    {
+        return StaffRecord::where($where)->update($data);
+    }
+
+    /********** BLOOD GROUPS ********/
+    public function getBloodGroups()
+    {
+        return BloodGroup::orderBy('name')->get();
+    }
+
+    /********** COUNT STUDENTS ********/
+    public function countStudents()
+    {
+        return User::role('student')->count();
+    }
+}
