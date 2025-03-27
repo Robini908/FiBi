@@ -47,7 +47,7 @@ class="bg-gray-800 text-white w-64 min-h-screen fixed left-0 top-0 transform tra
                         </div>
                         <div class="font-size-xs opacity-50">
                             <i class="icon-user font-size-sm"></i>
-                            &nbsp;{{ ucwords(str_replace('_', ' ', $user->userType->title ?? 'User')) }}
+                            &nbsp;{{ ucwords(str_replace('_', ' ', $user->roles->first()->name ?? 'User')) }}
                         </div>
                     </div>
 
@@ -370,7 +370,7 @@ class="bg-gray-800 text-white w-64 min-h-screen fixed left-0 top-0 transform tra
                                     </a>
                             @endif
 
-                            @include('pages.' . Qs::getUserType() . '.menu')
+                            @include('pages.' . Qs::getUserRole() . '.menu')
 
                                 <a href="{{ route('my_account') }}"
                            class="flex items-center px-4 py-2 text-sm font-medium rounded-md {{ Route::is('my_account') ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">

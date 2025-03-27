@@ -138,7 +138,7 @@ class NotificationService
         $script = "
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
-                    window.livewire.emit('toast', '{$toast['type']}', '{$toast['message']}', " . 
+                    window.livewire.dispatch('toast', '{$toast['type']}', '{$toast['message']}', " . 
                         ($toast['title'] ? "'{$toast['title']}'" : 'null') . 
                         ", {$toast['duration']});
                 });

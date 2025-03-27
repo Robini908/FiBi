@@ -12,6 +12,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Models\AcademicYear;
+use App\Models\Assignment;
 
 class SubjectTeacherAssignment extends Component
 {
@@ -53,6 +55,24 @@ class SubjectTeacherAssignment extends Component
     // Settings repository
     protected $settingRepo;
     
+    // Filter properties
+    public $filterTeacher = '';
+    public $filterSubject = '';
+    public $filterClass = '';
+    public $filterAcademicYear = '';
+    public $filterStatus = '';
+    public $filterPrimary = '';
+    public $perPage = 10;
+    public $search = '';
+    
+    // Statistics properties
+    public $activeCount;
+    public $primaryCount;
+    public $teacherCount;
+    
+    // Hardcoded academic years (until AcademicYear model is available)
+    public $academicYears = [];
+    
     /**
      * Get the SettingRepo instance
      */
@@ -80,13 +100,23 @@ class SubjectTeacherAssignment extends Component
         
         $this->academicTerm = 'Term 1';
         $this->form['academic_term'] = 'Term 1';
+        
+        // Set up hardcoded academic years
+        $this->setupAcademicYears();
+        
+        // Set default academic year to current
+        $this->filterAcademicYear = '2023-2024';
+        $this->academicYearId = '2023-2024';
+        
+        // Calculate initial statistics
+        $this->calculateStatistics();
     }
     
     public function loadDropdownData()
     {
-        // Fetch teachers correctly by joining with user_types table
-        $this->teachers = User::whereHas('userType', function($query) {
-            $query->where('title', 'teacher');
+        // Fetch teachers correctly by using Spatie's roles
+        $this->teachers = User::whereHas('roles', function($query) {
+            $query->where('name', 'teacher');
         })->orderBy('name')->get();
         
         $this->subjects = Subject::orderBy('subject_name')->get();
@@ -159,6 +189,14 @@ class SubjectTeacherAssignment extends Component
             'notes' => '',
         ];
         $this->currentAssignmentId = null;
+        
+        // Keep the current academic year
+        if (!$this->form['academic_year_id']) {
+            $currentAcademicYear = AcademicYear::where('is_current', true)->first();
+            if ($currentAcademicYear) {
+                $this->form['academic_year_id'] = $currentAcademicYear->id;
+            }
+        }
     }
     
     public function edit($id)
@@ -334,6 +372,7 @@ class SubjectTeacherAssignment extends Component
         $query = TeacherSubjectAssignment::query()
             ->with(['teacher', 'subject', 'myClass', 'section']);
             
+        // Apply filters only if they are set
         if ($this->academicYear) {
             $query->where('academic_year_id', $this->academicYear);
         }
@@ -364,8 +403,41 @@ class SubjectTeacherAssignment extends Component
         
         $assignments = $query->orderBy('created_at', 'desc')->paginate(10);
         
+        // Calculate statistics
+        $this->calculateStatistics();
+        
         return view('livewire.subject-teacher-assignment', [
             'assignments' => $assignments
         ]);
+    }
+    
+    public function calculateStatistics()
+    {
+        $baseQuery = Assignment::query();
+        
+        // Apply academic year filter to statistics if set
+        if ($this->filterAcademicYear) {
+            $baseQuery->where('academic_year_id', $this->filterAcademicYear);
+        }
+        
+        $this->activeCount = (clone $baseQuery)->where('is_active', true)->count();
+        $this->primaryCount = (clone $baseQuery)->where('is_primary', true)->count();
+        $this->teacherCount = (clone $baseQuery)
+            ->where('is_active', true)
+            ->distinct('teacher_id')
+            ->count('teacher_id');
+    }
+    
+    /**
+     * Setup hardcoded academic years
+     */
+    private function setupAcademicYears()
+    {
+        $this->academicYears = [
+            ['id' => '2021-2022', 'name' => '2021-2022'],
+            ['id' => '2022-2023', 'name' => '2022-2023'],
+            ['id' => '2023-2024', 'name' => '2023-2024', 'is_current' => true],
+            ['id' => '2024-2025', 'name' => '2024-2025'],
+        ];
     }
 }

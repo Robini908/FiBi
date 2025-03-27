@@ -293,6 +293,17 @@ Route::group(['middleware' => 'auth'], function () {
 Route::group(['namespace' => 'SuperAdmin', 'middleware' => 'super_admin', 'prefix' => 'super_admin'], function () {
     Route::get('/settings', 'SettingController@index')->name('settings');
     Route::put('/settings', 'SettingController@update')->name('settings.update');
+    
+    // New Livewire School Settings Route
+    Route::get('/school-settings', function() {
+        return view('pages.super_admin.school-settings', [
+            'title' => 'School Settings',
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'link' => route('dashboard')],
+                ['label' => 'School Settings', 'link' => null]
+            ]
+        ]);
+    })->name('school.settings');
 });
 
 Route::get('/demo', function () {
@@ -346,10 +357,35 @@ Route::group(['prefix' => 'finance', 'middleware' => 'auth'], function () {
         return view('pages.finance.student-fee-payments');
     })->name('finance.student-fee-payments');
     
+    // Parent route to view children's fee payments
+    Route::get('/student-fee-payments/my-children', function () {
+        return view('pages.finance.student-fee-payments', ['view_type' => 'my_children']);
+    })->name('finance.student-fee-payments.my-children')->middleware(['auth', 'parent']);
+
     // Student Arrears - Available to all users (permissions handled in component)
     Route::get('/student-arrears', function () {
         return view('pages.finance.student-arrears');
     })->name('finance.student-arrears');
+    
+    // Student route to view their own arrears
+    Route::get('/student-arrears/my-arrears', function () {
+        return view('pages.finance.student-arrears', ['view_type' => 'my_arrears']);
+    })->name('finance.arrears.my-arrears')->middleware(['auth', 'student']);
+    
+    // Parent route to view children's arrears
+    Route::get('/student-arrears/my-children', function () {
+        return view('pages.finance.student-arrears', ['view_type' => 'my_children']);
+    })->name('finance.arrears.my-children')->middleware(['auth', 'parent']);
+    
+    // Student route to view their fee structure
+    Route::get('/fee-structure/student', function () {
+        return view('pages.finance.fee-structure', ['view_type' => 'student']);
+    })->name('finance.fee-structure.view-for-student')->middleware(['auth', 'student']);
+    
+    // Parent route to view children's fee structure
+    Route::get('/fee-structure/children', function () {
+        return view('pages.finance.fee-structure', ['view_type' => 'children']);
+    })->name('finance.fee-structure.view-for-children')->middleware(['auth', 'parent']);
 });
 
 // LGA Route - Returns empty array since we've removed LGA functionality
@@ -358,7 +394,7 @@ Route::get('/get_lga/{id}', 'AjaxController@get_lga')->name('get_lga')->middlewa
 // Staff Management Routes
 Route::prefix('staff')->name('staff.')->middleware(['auth', 'checkUserType:admin,super-admin'])->group(function () {
     // Staff List
-    Route::get('/', function() {
+    Route::get('/', function () {
         return view('pages.staff.index', [
             'title' => 'Staff Management',
             'breadcrumbs' => [
@@ -367,9 +403,20 @@ Route::prefix('staff')->name('staff.')->middleware(['auth', 'checkUserType:admin
             ]
         ]);
     })->name('index');
-    
+
+    // New Staff Management Page using Livewire
+    Route::get('/manage', function () {
+        return view('pages.staff.manage', [
+            'title' => 'Staff Management',
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'link' => route('dashboard')],
+                ['label' => 'Staff Management', 'link' => null]
+            ]
+        ]);
+    })->name('manage');
+
     // Staff Detail View
-    Route::get('/{id}', function($id) {
+    Route::get('/{id}', function ($id) {
         return view('pages.staff.detail', [
             'staff_id' => $id,
             'title' => 'Staff Details',
@@ -380,9 +427,9 @@ Route::prefix('staff')->name('staff.')->middleware(['auth', 'checkUserType:admin
             ]
         ]);
     })->name('show');
-    
+
     // Staff Qualifications
-    Route::get('/{id}/qualifications', function($id) {
+    Route::get('/{id}/qualifications', function ($id) {
         return view('pages.staff.qualifications', [
             'staff_id' => $id,
             'title' => 'Staff Qualifications',
@@ -394,7 +441,7 @@ Route::prefix('staff')->name('staff.')->middleware(['auth', 'checkUserType:admin
             ]
         ]);
     })->name('qualifications');
-    
+
     // Download Staff Report
     Route::get('/download/report', [App\Http\Controllers\StaffController::class, 'downloadReport'])->name('download.report');
 });

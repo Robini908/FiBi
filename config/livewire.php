@@ -38,7 +38,7 @@ return [
     |
     */
 
-    'layout' => 'layouts.master',
+    'layout' => 'components.layouts.app',
 
     /*
     |---------------------------------------------------------------------------
@@ -50,8 +50,7 @@ return [
     |
     */
 
-    'lazy_placeholder' => 'livewire.placeholder',
-
+    'lazy_placeholder' => null,
 
     /*
     |---------------------------------------------------------------------------
@@ -89,7 +88,7 @@ return [
     |
     */
 
-    'render_on_redirect' => true,
+    'render_on_redirect' => false,
 
     /*
     |---------------------------------------------------------------------------

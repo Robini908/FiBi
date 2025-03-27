@@ -4,6 +4,7 @@
     class="fixed inset-0 overflow-y-auto z-60"
     x-on:keydown.escape.window="open = false"
     style="display: none;"
+    x-cloak
 >
     <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div
@@ -54,29 +55,32 @@
                     </div>
                 </div>
             </div>
-            <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                <button
-                    wire:click="deleteAllocation"
-                    type="button"
-                    class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                    wire:loading.attr="disabled"
-                >
-                    <span wire:loading.class="hidden" wire:target="deleteAllocation">Delete</span>
-                    <span wire:loading wire:target="deleteAllocation" class="inline-flex items-center">
-                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Deleting...
-                    </span>
-                </button>
-                <button
-                    wire:click="closeDeleteModal"
-                    type="button"
-                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:w-auto sm:text-sm"
-                >
-                    Cancel
-                </button>
+            
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:py-4 mt-5 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 rounded-b-lg">
+                <div class="sm:flex sm:flex-row-reverse">
+                    <button
+                        wire:click="deleteAllocation"
+                        type="button"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-150"
+                        wire:loading.attr="disabled"
+                    >
+                        <span wire:loading.class="hidden" wire:target="deleteAllocation">Delete Permanently</span>
+                        <span wire:loading wire:target="deleteAllocation" class="inline-flex items-center">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Deleting...
+                        </span>
+                    </button>
+                    <button
+                        wire:click="closeDeleteModal"
+                        type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-150"
+                    >
+                        Cancel
+                    </button>
+                </div>
             </div>
         </div>
     </div>

@@ -44,6 +44,7 @@ class FeeStructure extends Component
     public $isAccountant = false;
     public $isTeacher = false;
     public $isStudent = false;
+    public $isParent = false;
     
     // Form fields
     public $my_class_id;
@@ -121,6 +122,39 @@ class FeeStructure extends Component
         } else {
             $this->term = 3;
         }
+        
+        // Check for specific view types
+        $viewType = request()->input('view_type');
+        
+        // Handle student view - automatically filter to the student's class
+        if ($viewType === 'student' && $this->isStudent) {
+            // Get the student's class
+            $studentRecord = \App\Models\StudentRecord::where('user_id', Auth::id())->first();
+            if ($studentRecord) {
+                $this->classFilter = $studentRecord->my_class_id;
+                // Auto-apply filters to show current fees
+                $this->yearFilter = $this->academic_year;
+                $this->termFilter = $this->term;
+                // Only show mandatory fees that are active
+                $this->categoryFilter = 'mandatory';
+            }
+        }
+        // Handle parent's children view
+        elseif ($viewType === 'children' && $this->isParent) {
+            // Set title and possibly preselect a child's class if they only have one child
+            $parentId = Auth::id();
+            $children = \App\Models\StudentRecord::where('parent_id_no', $parentId)->get();
+            
+            if ($children->count() === 1) {
+                // If parent only has one child, automatically filter to that child's class
+                $this->classFilter = $children->first()->my_class_id;
+                // Auto-apply filters to show current fees
+                $this->yearFilter = $this->academic_year;
+                $this->termFilter = $this->term;
+                // Only show mandatory fees that are active
+                $this->categoryFilter = 'mandatory';
+            }
+        }
     }
     
     /**
@@ -133,6 +167,7 @@ class FeeStructure extends Component
             $this->isAccountant = Qs::isAccountant();
             $this->isTeacher = Qs::userIsTeacher();
             $this->isStudent = Qs::userIsStudent();
+            $this->isParent = Qs::userIsParent();
             
             // Update management permission
             $this->hasManagePermission = $this->isAdmin || $this->isAccountant;
@@ -620,6 +655,12 @@ class FeeStructure extends Component
         
         return view('livewire.finance.fee-structure', [
             'feeStructures' => $query->paginate($this->perPage),
+            'isAdmin' => $this->isAdmin,
+            'isAccountant' => $this->isAccountant,
+            'isTeacher' => $this->isTeacher,
+            'isStudent' => $this->isStudent,
+            'isParent' => $this->isParent,
+            'hasManagePermission' => $this->hasManagePermission
         ]);
     }
     

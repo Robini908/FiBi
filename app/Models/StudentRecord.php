@@ -111,18 +111,40 @@ class StudentRecord extends Model
 
     /**
      * Get the current class and section for the student.
+     * 
+     * @param int $academicYear The academic year to check (e.g., 2023)
+     * @param string|null $academicPeriod Optional period like semester/term
+     * @return array|null Array with class and section objects or null if not found
      */
-    public function getCurrentClassAndSection($academicYear)
+    public function getCurrentClassAndSection(int $academicYear, ?string $academicPeriod = null)
     {
-        $latestTransition = $this->transitions()
-            ->where('transition_year', $academicYear)
-            ->latest('decision_date')
-            ->first();
-
-        return $latestTransition ? [
-            'class' => $latestTransition->targetClass,
-            'section' => $latestTransition->targetSection,
-        ] : null;
+        $query = $this->transitions()
+            ->where('to_academic_year', $academicYear)
+            ->where('is_active', true);
+            
+        if ($academicPeriod) {
+            $query->where('academic_period', $academicPeriod);
+        }
+        
+        $activeTransition = $query->latest('effective_date')->first();
+        
+        if (!$activeTransition) {
+            // If no active transition is found for the specified year,
+            // fall back to the base class and section if it matches the academic year
+            if ($this->my_class_id && $this->section_id) {
+                return [
+                    'class' => $this->my_class,
+                    'section' => $this->section,
+                ];
+            }
+            return null;
+        }
+        
+        return [
+            'class' => $activeTransition->toClass,
+            'section' => $activeTransition->toSection,
+            'transition' => $activeTransition,
+        ];
     }
 
 
@@ -155,14 +177,17 @@ class StudentRecord extends Model
 
 
 
-    public function getCurrentClass($academicYear)
+    /**
+     * Get the current class for the student in a specific academic year.
+     * 
+     * @param int $academicYear The academic year to check
+     * @param string|null $academicPeriod Optional period like semester/term
+     * @return MyClass|null The class object or null if not found
+     */
+    public function getCurrentClass(int $academicYear, ?string $academicPeriod = null)
     {
-        $latestTransition = $this->transitions()
-            ->where('academic_year', $academicYear)
-            ->latest('event_date')
-            ->first();
-
-        return $latestTransition ? $latestTransition->newClass : null;
+        $classAndSection = $this->getCurrentClassAndSection($academicYear, $academicPeriod);
+        return $classAndSection ? $classAndSection['class'] : null;
     }
 
     /**
@@ -222,5 +247,42 @@ class StudentRecord extends Model
 
         // If subject selection is enabled, check if student has selected this subject
         return $this->subjects()->where('subjects.id', $subjectId)->exists();
+    }
+
+    /**
+     * Get all transitions for this student.
+     * 
+     * @return \Illuminate\Database\Eloquent\Collection Collection of transitions
+     */
+    public function getAllTransitions()
+    {
+        return $this->transitions()->orderBy('effective_date', 'desc')->get();
+    }
+    
+    /**
+     * Create a new transition for this student.
+     * 
+     * @param array $attributes The transition attributes
+     * @param bool $applyImmediately Whether to apply the transition immediately
+     * @return StudentTransition|null The created transition or null if failed
+     */
+    public function createTransition(array $attributes, bool $applyImmediately = true)
+    {
+        $attributes['student_id'] = $this->id;
+        
+        // If from_class_id and from_section_id are not provided, use current values
+        if (!isset($attributes['from_class_id'])) {
+            $attributes['from_class_id'] = $this->my_class_id;
+        }
+        
+        if (!isset($attributes['from_section_id'])) {
+            $attributes['from_section_id'] = $this->section_id;
+        }
+        
+        if ($applyImmediately) {
+            return StudentTransition::createAndApply($attributes);
+        }
+        
+        return StudentTransition::create($attributes);
     }
 }

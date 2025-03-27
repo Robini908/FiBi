@@ -4,6 +4,6 @@
 
 <script>
     window.addEventListener('toast', event => {
-        window.livewire.emit('toast', event.detail.type, event.detail.message, event.detail.title, event.detail.duration);
+        window.livewire.dispatch('toast', event.detail.type, event.detail.message, event.detail.title, event.detail.duration);
     });
 </script> 

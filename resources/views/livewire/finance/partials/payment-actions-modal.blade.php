@@ -1,30 +1,57 @@
 <!-- Payment Cancel Confirmation Modal -->
-<div x-data x-show="$wire.showingCancelModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
+<div 
+    x-data="{ show: false }" 
+    x-init="
+        $watch('$wire.open_cancel_modal', value => { 
+            if (value) { 
+                show = true;
+                document.body.classList.add('overflow-hidden');
+            } else {
+                setTimeout(() => { show = false; }, 200);
+                document.body.classList.remove('overflow-hidden');
+            }
+        });
+    "
+    x-show="show"
+    x-transition.opacity.duration.300ms
+    @keydown.escape.window="$wire.closeCancelModal()"
+    class="fixed inset-0 z-50 overflow-y-auto"
+    x-cloak
+>
     <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay -->
         <div 
-            x-show="$wire.showingCancelModal" 
+            x-show="show" 
             x-transition:enter="ease-out duration-300" 
             x-transition:enter-start="opacity-0" 
             x-transition:enter-end="opacity-100" 
             x-transition:leave="ease-in duration-200" 
             x-transition:leave-start="opacity-100" 
-            x-transition:leave-end="opacity-0" 
+            x-transition:leave-end="opacity-0"
+            @click="$wire.closeCancelModal()" 
             class="fixed inset-0 transition-opacity"
+            aria-hidden="true"
         >
             <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
         </div>
 
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        <!-- This element is to trick the browser into centering the modal contents. -->
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
         
+        <!-- Modal panel -->
         <div 
-            x-show="$wire.showingCancelModal" 
+            x-show="show" 
             x-transition:enter="ease-out duration-300" 
             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
             x-transition:leave="ease-in duration-200" 
             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
-            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            @click.stop
             class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+            role="dialog" 
+            aria-modal="true" 
+            aria-labelledby="cancel-payment-modal"
         >
             <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div class="sm:flex sm:items-start">
@@ -34,7 +61,7 @@
                         </svg>
                     </div>
                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="cancel-payment-modal">
                             Cancel Payment
                         </h3>
                         <div class="mt-2">
@@ -49,13 +76,14 @@
                                         id="cancelReason" 
                                         name="cancelReason" 
                                         rows="3" 
-                                        wire:model.defer="cancelReason" 
+                                        wire:model.defer="cancellation_reason" 
                                         class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                         placeholder="Provide a reason for cancelling this payment"
                                         required
+                                        x-init="$nextTick(() => { $el.focus() })"
                                     ></textarea>
                                 </div>
-                                @error('cancelReason')
+                                @error('cancellation_reason')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
@@ -66,17 +94,18 @@
             <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button 
                     type="button" 
-                    wire:click="cancelPayment" 
+                    wire:click="processCancelPaymentAction" 
                     class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
                     wire:loading.attr="disabled"
                 >
-                    <span wire:loading wire:target="cancelPayment" class="mr-2">
+                    <span wire:loading.class="inline-flex" wire:loading.class.remove="hidden" wire:target="processCancelPaymentAction" class="hidden mr-2">
                         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </span>
-                    Confirm Cancellation
+                    <span wire:loading.class="hidden" wire:target="processCancelPaymentAction">Confirm Cancellation</span>
+                    <span wire:loading.class.remove="hidden" wire:loading class="hidden" wire:target="processCancelPaymentAction">Processing...</span>
                 </button>
                 <button 
                     type="button" 
@@ -91,32 +120,59 @@
 </div>
 
 <!-- Payment Confirmation Modal -->
-<div x-data x-show="$wire.showingConfirmModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
+<div 
+    x-data="{ show: false }" 
+    x-init="
+        $watch('$wire.open_confirm_modal', value => { 
+            if (value) { 
+                show = true;
+                document.body.classList.add('overflow-hidden');
+            } else {
+                setTimeout(() => { show = false; }, 200);
+                document.body.classList.remove('overflow-hidden');
+            }
+        });
+    "
+    x-show="show"
+    x-transition.opacity.duration.300ms
+    @keydown.escape.window="$wire.closeConfirmModal()"
+    class="fixed inset-0 z-50 overflow-y-auto"
+    x-cloak
+>
     <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay -->
         <div 
-            x-show="$wire.showingConfirmModal" 
+            x-show="show" 
             x-transition:enter="ease-out duration-300" 
             x-transition:enter-start="opacity-0" 
             x-transition:enter-end="opacity-100" 
             x-transition:leave="ease-in duration-200" 
             x-transition:leave-start="opacity-100" 
-            x-transition:leave-end="opacity-0" 
+            x-transition:leave-end="opacity-0"
+            @click="$wire.closeConfirmModal()" 
             class="fixed inset-0 transition-opacity"
+            aria-hidden="true"
         >
             <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
         </div>
 
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        <!-- This element is to trick the browser into centering the modal contents. -->
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
         
+        <!-- Modal panel -->
         <div 
-            x-show="$wire.showingConfirmModal" 
+            x-show="show" 
             x-transition:enter="ease-out duration-300" 
             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
             x-transition:leave="ease-in duration-200" 
             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
-            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            @click.stop
             class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+            role="dialog" 
+            aria-modal="true" 
+            aria-labelledby="confirm-payment-modal"
         >
             <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div class="sm:flex sm:items-start">
@@ -126,7 +182,7 @@
                         </svg>
                     </div>
                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="confirm-payment-modal">
                             Confirm Payment
                         </h3>
                         <div class="mt-2">
@@ -144,6 +200,7 @@
                                         wire:model.defer="confirmationNote" 
                                         class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                         placeholder="Any additional notes regarding this payment confirmation"
+                                        x-init="$nextTick(() => { $el.focus() })"
                                     ></textarea>
                                 </div>
                             </div>
@@ -158,13 +215,14 @@
                     class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
                     wire:loading.attr="disabled"
                 >
-                    <span wire:loading wire:target="confirmPaymentAction" class="mr-2">
+                    <span wire:loading.class="inline-flex" wire:loading.class.remove="hidden" wire:target="confirmPaymentAction" class="hidden mr-2">
                         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </span>
-                    Confirm Payment
+                    <span wire:loading.class="hidden" wire:target="confirmPaymentAction">Confirm Payment</span>
+                    <span wire:loading.class.remove="hidden" wire:loading class="hidden" wire:target="confirmPaymentAction">Processing...</span>
                 </button>
                 <button 
                     type="button" 
@@ -179,32 +237,59 @@
 </div>
 
 <!-- Edit Payment Modal -->
-<div x-data x-show="$wire.showingEditModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
+<div 
+    x-data="{ show: false }" 
+    x-init="
+        $watch('$wire.showingEditModal', value => { 
+            if (value) { 
+                show = true; 
+                document.body.classList.add('overflow-hidden');
+            } else {
+                setTimeout(() => { show = false; }, 200);
+                document.body.classList.remove('overflow-hidden');
+            }
+        });
+    "
+    x-show="show"
+    x-transition.opacity.duration.300ms
+    @keydown.escape.window="$wire.closeEditModal()"
+    class="fixed inset-0 z-50 overflow-y-auto"
+    x-cloak
+>
     <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay -->
         <div 
-            x-show="$wire.showingEditModal" 
+            x-show="show" 
             x-transition:enter="ease-out duration-300" 
             x-transition:enter-start="opacity-0" 
             x-transition:enter-end="opacity-100" 
             x-transition:leave="ease-in duration-200" 
             x-transition:leave-start="opacity-100" 
-            x-transition:leave-end="opacity-0" 
+            x-transition:leave-end="opacity-0"
+            @click="$wire.closeEditModal()" 
             class="fixed inset-0 transition-opacity"
+            aria-hidden="true"
         >
             <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
         </div>
 
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        <!-- This element is to trick the browser into centering the modal contents. -->
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
         
+        <!-- Modal panel -->
         <div 
-            x-show="$wire.showingEditModal" 
+            x-show="show" 
             x-transition:enter="ease-out duration-300" 
             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
             x-transition:leave="ease-in duration-200" 
             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
-            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            @click.stop
             class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+            role="dialog" 
+            aria-modal="true" 
+            aria-labelledby="edit-payment-modal"
         >
             <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div class="sm:flex sm:items-start">
@@ -214,7 +299,7 @@
                         </svg>
                     </div>
                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="edit-payment-modal">
                             Edit Payment
                         </h3>
                         <div class="mt-4 space-y-4">
@@ -229,6 +314,7 @@
                                         wire:model.defer="editData.amount" 
                                         class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                         required
+                                        x-init="$nextTick(() => { $el.focus() })"
                                     >
                                 </div>
                                 @error('editData.amount')
@@ -260,13 +346,17 @@
                                     <textarea 
                                         id="editNotes" 
                                         wire:model.defer="editData.notes" 
-                                        rows="2" 
+                                        rows="3" 
                                         class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                                        placeholder="Additional notes about this payment"
+                                        placeholder="Any notes about this payment"
                                     ></textarea>
                                 </div>
+                                @error('editData.notes')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                             
+                            <!-- Edit Reason -->
                             <div>
                                 <label for="editReason" class="block text-sm font-medium text-gray-700">Reason for Edit <span class="text-red-500">*</span></label>
                                 <div class="mt-1">
@@ -275,7 +365,7 @@
                                         wire:model.defer="editReason" 
                                         rows="2" 
                                         class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                                        placeholder="Why are you editing this payment record? (Required for audit trail)"
+                                        placeholder="Why are you editing this payment?"
                                         required
                                     ></textarea>
                                 </div>
@@ -294,13 +384,14 @@
                     class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
                     wire:loading.attr="disabled"
                 >
-                    <span wire:loading wire:target="updatePayment" class="mr-2">
+                    <span wire:loading.class="inline-flex" wire:loading.class.remove="hidden" wire:target="updatePayment" class="hidden mr-2">
                         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </span>
-                    Save Changes
+                    <span wire:loading.class="hidden" wire:target="updatePayment">Update Payment</span>
+                    <span wire:loading.class.remove="hidden" wire:loading class="hidden" wire:target="updatePayment">Updating...</span>
                 </button>
                 <button 
                     type="button" 

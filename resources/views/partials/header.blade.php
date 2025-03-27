@@ -3,8 +3,8 @@
 @endphp
 
 <!-- Top Navigation Bar -->
-<header class="fixed right-0 top-0 md:left-64 left-0 bg-white dark:bg-gray-800 h-16 z-30 shadow-sm border-b border-gray-100 dark:border-gray-700">
-    <div class="h-full px-4 flex items-center justify-between">
+<header class="fixed right-0 top-0 md:left-64 left-0 bg-white dark:bg-gray-800 h-16 z-40 shadow-sm border-b border-gray-100 dark:border-gray-700">
+    <div class="h-full px-4 sm:px-6 flex items-center justify-between">
         <!-- Left side -->
         <div class="flex items-center">
             <!-- Mobile menu button -->
@@ -26,7 +26,7 @@
         </div>
 
         <!-- Right side -->
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2">
             <!-- Notifications Dropdown -->
             <div 
                 x-data="{ open: false, unreadCount: {{ Auth::user()->unreadNotifications ? Auth::user()->unreadNotifications->count() : 0 }} }" 
@@ -36,7 +36,7 @@
             >
                 <button 
                     @click="open = !open" 
-                    class="p-2 text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-200"
+                    class="p-2 text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-200"
                     aria-label="View notifications"
                 >
                     <span class="sr-only">Notifications</span>
@@ -47,7 +47,7 @@
                     <span 
                         x-show="unreadCount > 0" 
                         x-text="unreadCount > 9 ? '9+' : unreadCount"
-                        class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full"
+                        class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-green-500 rounded-full"
                     ></span>
                 </button>
                 
@@ -61,7 +61,7 @@
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
-                    class="origin-top-right absolute right-0 mt-2 w-80 rounded-lg shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 dark:divide-gray-700 focus:outline-none"
+                    class="origin-top-right absolute right-0 mt-2 w-80 rounded-lg shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 dark:divide-gray-700 focus:outline-none z-50"
                     x-cloak
                 >
                     <div class="p-4">
@@ -77,14 +77,22 @@
 
             <!-- Messages Dropdown -->
             <div 
-                x-data="{ open: false, unreadCount: {{ Auth::user()->unreadMessages ? Auth::user()->unreadMessages->count() : 0 }} }" 
+                x-data="{ 
+                    open: false, 
+                    unreadCount: {{ Auth::user()->unreadMessages ? Auth::user()->unreadMessages->count() : 0 }},
+                    closeAndRedirect(userId) {
+                        this.open = false;
+                        window.location.href = '{{ route('messages.index') }}' + (userId ? '?userId=' + userId : '');
+                    }
+                }" 
                 class="relative"
                 @message-read.window="unreadCount = Math.max(0, unreadCount - 1)"
                 @message-received.window="unreadCount++"
+                @unreadCountUpdated.window="unreadCount = $event.detail.count"
             >
                 <button 
                     @click="open = !open" 
-                    class="p-2 text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-200"
+                    class="p-2 text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-200"
                     aria-label="View messages"
                 >
                     <span class="sr-only">Messages</span>
@@ -95,7 +103,7 @@
                     <span 
                         x-show="unreadCount > 0" 
                         x-text="unreadCount > 9 ? '9+' : unreadCount"
-                        class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full"
+                        class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-green-500 rounded-full"
                     ></span>
                 </button>
                 
@@ -109,25 +117,24 @@
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
-                    class="origin-top-right absolute right-0 mt-2 w-80 rounded-lg shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 dark:divide-gray-700 focus:outline-none"
+                    class="origin-top-right absolute right-0 mt-2 w-80 rounded-lg shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 dark:divide-gray-700 focus:outline-none z-50"
                     x-cloak
                 >
-                    <div class="p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">Messages</h3>
-                            <a href="{{ route('messages.index') }}" class="text-xs font-medium text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300">View all</a>
-                        </div>
-                        <!-- Livewire Messages Component -->
-                        @livewire('messages')
+                    <!-- Livewire Messages Component with click handling -->
+                    <div @click.stop class="max-h-[500px] overflow-hidden rounded-lg">
+                        @livewire('messages', ['clickHandler' => 'function(userId) { $el.closest(\'[x-data]\')._x.$data.closeAndRedirect(userId); }'])
                     </div>
                 </div>
             </div>
 
+            <!-- User Impersonation Component -->
+            @livewire('impersonate-user')
+
             <!-- Profile Dropdown -->
-            <div x-data="{ open: false }" class="relative ml-3">
+            <div x-data="{ open: false }" class="relative ml-2">
                 <button 
                     @click="open = !open" 
-                    class="flex items-center space-x-2 text-sm focus:outline-none"
+                    class="flex items-center space-x-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 rounded-full"
                     id="user-menu-button"
                     aria-expanded="false"
                     aria-haspopup="true"
@@ -140,7 +147,7 @@
                             onerror="this.src='{{ asset('global_assets/images/user.png') }}'"
                         >
                     </div>
-                    <span class="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">{{ Str::limit(Auth::user()->name, 15) }}</span>
+                    <span class="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300 max-w-[100px] truncate">{{ Str::limit(Auth::user()->name, 15) }}</span>
                     <svg class="hidden md:block h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
@@ -156,7 +163,7 @@
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-1"
-                    class="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none"
+                    class="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
                     role="menu"
                     aria-orientation="vertical"
                     aria-labelledby="user-menu-button"
@@ -223,7 +230,7 @@
                 'ring-green-500': toast.type === 'success',
                 'ring-blue-500': toast.type === 'info',
                 'ring-yellow-500': toast.type === 'warning',
-                'ring-red-500': toast.type === 'danger'
+                'ring-red-500': toast.type === 'danger' || toast.type === 'error'
             }"
         >
             <div class="p-4">
@@ -242,7 +249,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                         <!-- Error Icon -->
-                        <svg x-show="toast.type === 'danger'" class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg x-show="toast.type === 'danger' || toast.type === 'error'" class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>

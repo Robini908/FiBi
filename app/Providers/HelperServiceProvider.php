@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Helpers\StudentHelper;
+use App\Helpers\SettingsHelper;
 
 class HelperServiceProvider extends ServiceProvider
 {
@@ -15,6 +16,11 @@ class HelperServiceProvider extends ServiceProvider
         // Register the StudentHelper class as a singleton
         $this->app->singleton('student-helper', function () {
             return new StudentHelper();
+        });
+
+        // Register the SettingsHelper class as a singleton
+        $this->app->singleton('settings', function () {
+            return new SettingsHelper();
         });
     }
 

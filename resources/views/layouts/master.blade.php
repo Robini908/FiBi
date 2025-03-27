@@ -12,9 +12,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Flatpickr for datepicker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/rangePlugin.js"></script>
+    
+    <!-- ApexCharts for Livewire Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
     <!-- Styles -->
     <style>
         [x-cloak] { display: none !important; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
     </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
@@ -30,7 +41,7 @@
         @include('partials.sidebar')
 
         <!-- Main content -->
-        <div class="lg:pl-64 flex flex-col flex-1">
+        <div class="md:pl-64 flex flex-col min-h-screen">
             <!-- Top nav -->
             @include('partials.header')
 
@@ -45,6 +56,11 @@
                                 <h1 class="text-lg font-medium leading-6 text-gray-900">
                                     @yield('page_title', 'Dashboard')
                                 </h1>
+                                
+                                <!-- Breadcrumbs section -->
+                                <div class="mt-1">
+                                    @yield('breadcrumbs')
+                                </div>
                             </div>
                             <div class="mt-4 flex md:mt-0 md:ml-4">
                                 <!-- Action buttons go here -->
@@ -56,7 +72,7 @@
 
                 <!-- Alert section -->
                 @if($errors->any())
-                    <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
                         <div class="rounded-md bg-red-50 p-4">
                             <div class="flex">
                                 <div class="flex-shrink-0">
@@ -85,14 +101,14 @@
                 @include('partials.flash')
 
                 <!-- Main content area -->
-                <div class="mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                     @yield('content')
                 </div>
             </main>
 
             <!-- Footer -->
             <footer class="bg-white border-t border-gray-100">
-                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
                     <p class="text-center text-sm text-gray-500">
                         &copy; {{ date('Y') }} {{ config('app.name', 'MBUKU ERP') }}. All rights reserved.
                     </p>
@@ -102,6 +118,8 @@
     </div>
 
     @livewireScripts
+    @livewireChartsScripts
+
     @notificationScripts
     @stack('scripts')
 </body>

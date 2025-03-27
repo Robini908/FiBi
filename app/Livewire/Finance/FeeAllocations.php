@@ -55,6 +55,11 @@ class FeeAllocations extends Component
     public $availableVoteheads = [];
     public $accountBalance = 0;
     public $accountName = '';
+
+    // Statistics properties
+    public $pendingCount = 0;
+    public $approvedCount = 0;
+    public $totalAmount = 0;
     
     // Listeners
     protected $listeners = ['deleteAllocation', 'approveAllocation', 'refreshFeeAllocations' => '$refresh'];
@@ -101,6 +106,54 @@ class FeeAllocations extends Component
         // Apply the same defaults to filters
         $this->yearFilter = $this->form['academic_year'];
         $this->termFilter = $this->form['term'];
+
+        // Load initial statistics
+        $this->loadStatistics();
+    }
+
+    /**
+     * Load statistics for the dashboard cards
+     */
+    private function loadStatistics()
+    {
+        $query = FeeAllocation::query();
+
+        // Apply the same filters as the main query
+        if ($this->search) {
+            $query->where(function($q) {
+                $q->whereHas('financeAccount', function ($subq) {
+                    $subq->where('name', 'like', "%{$this->search}%");
+                })->orWhereHas('votehead', function ($subq) {
+                    $subq->where('name', 'like', "%{$this->search}%");
+                })->orWhere('description', 'like', "%{$this->search}%");
+            });
+        }
+        
+        if ($this->financeAccountFilter) {
+            $query->where('finance_account_id', $this->financeAccountFilter);
+        }
+        
+        if ($this->voteheadFilter) {
+            $query->where('votehead_id', $this->voteheadFilter);
+        }
+        
+        if ($this->yearFilter) {
+            $query->where('academic_year', $this->yearFilter);
+        }
+        
+        if ($this->termFilter) {
+            $query->where('term', $this->termFilter);
+        }
+
+        // Get statistics
+        $pendingCountQuery = clone $query;
+        $this->pendingCount = $pendingCountQuery->where('is_approved', false)->count();
+        
+        $approvedCountQuery = clone $query;
+        $this->approvedCount = $approvedCountQuery->where('is_approved', true)->count();
+        
+        $totalAmountQuery = clone $query;
+        $this->totalAmount = $totalAmountQuery->sum('amount');
     }
     
     /**
@@ -124,26 +177,27 @@ class FeeAllocations extends Component
     /**
      * Update available voteheads when account is selected
      */
-    public function updatedFinanceAccountId()
+    public function updatedFormFinanceAccountId()
     {
-        if (!$this->finance_account_id) {
+        if (!$this->form['finance_account_id']) {
             $this->availableVoteheads = [];
             $this->accountBalance = 0;
             $this->accountName = '';
             return;
         }
         
-        $account = FinanceAccount::find($this->finance_account_id);
+        $account = FinanceAccount::find($this->form['finance_account_id']);
         
         if ($account) {
             $this->accountName = $account->name;
-            $this->accountBalance = $account->unallocatedAmount($this->form['academic_year'], $this->form['term']);
+            $this->accountBalance = $account->current_balance;
             
-            // Get voteheads for this account
-            $this->availableVoteheads = AccountVotehead::where('finance_account_id', $this->finance_account_id)
-                ->where('is_active', true)
-                ->where('academic_year', $this->form['academic_year'])
-                ->where('term', $this->form['term'])
+            // Get all voteheads available for this account
+            $this->availableVoteheads = AccountVotehead::where('is_active', true)
+                ->where(function($query) use ($account) {
+                    $query->where('finance_account_id', $account->id)
+                          ->orWhereNull('finance_account_id');
+                })
                 ->orderBy('name')
                 ->get();
         } else {
@@ -152,25 +206,21 @@ class FeeAllocations extends Component
             $this->accountName = '';
         }
         
-        // Reset votehead selection if the selected one is not available
-        if ($this->votehead_id && 
-            $this->availableVoteheads instanceof \Illuminate\Support\Collection && 
-            !$this->availableVoteheads->contains('id', $this->votehead_id)) {
-            $this->votehead_id = null;
-        }
+        // Reset votehead selection
+        $this->form['votehead_id'] = '';
     }
     
     /**
      * Update votehead details when a votehead is selected
      */
-    public function updatedVoteheadId()
+    public function updatedFormVoteheadId()
     {
-        if (!$this->votehead_id) {
+        if (!$this->form['votehead_id']) {
             $this->voteheadName = '';
             return;
         }
         
-        $votehead = AccountVotehead::find($this->votehead_id);
+        $votehead = AccountVotehead::find($this->form['votehead_id']);
         if ($votehead) {
             $this->voteheadName = $votehead->name;
         }
@@ -257,6 +307,7 @@ class FeeAllocations extends Component
             
             DB::commit();
             $this->closeAllocationModal();
+            $this->loadStatistics(); // Refresh statistics
             $this->dispatch('toast', 'Fee allocation created successfully!', 'success');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -286,6 +337,9 @@ class FeeAllocations extends Component
             'term' => $allocation->term,
             'is_approved' => $allocation->is_approved,
         ];
+        
+        // Load available voteheads for this account
+        $this->updatedFormFinanceAccountId();
         
         // Set as editing mode
         $this->isEditing = true;
@@ -321,6 +375,7 @@ class FeeAllocations extends Component
             
             DB::commit();
             $this->closeAllocationModal();
+            $this->loadStatistics(); // Refresh statistics
             $this->dispatch('toast', 'Fee allocation updated successfully!', 'success');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -369,6 +424,7 @@ class FeeAllocations extends Component
             
             DB::commit();
             $this->closeDeleteModal();
+            $this->loadStatistics(); // Refresh statistics
             $this->dispatch('toast', 'Fee allocation deleted successfully!', 'success');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -405,6 +461,7 @@ class FeeAllocations extends Component
             ]);
             
             DB::commit();
+            $this->loadStatistics(); // Refresh statistics
             $this->dispatch('toast', 'Fee allocation approved successfully!', 'success');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -427,6 +484,7 @@ class FeeAllocations extends Component
     public function applyFilters()
     {
         $this->resetPage();
+        $this->loadStatistics();
     }
     
     /**
@@ -441,6 +499,7 @@ class FeeAllocations extends Component
         $this->yearFilter = '';
         $this->termFilter = '';
         $this->resetPage();
+        $this->loadStatistics();
     }
     
     /**
@@ -450,39 +509,47 @@ class FeeAllocations extends Component
     {
         $this->yearFilter = '';
         $this->termFilter = '';
+        $this->resetPage();
+        $this->loadStatistics();
     }
     
     /**
-     * Livewire lifecycle method
+     * Update properties when filters change
      */
-    public function updatingSearch()
+    public function updatedSearch()
     {
         $this->resetPage();
+        $this->loadStatistics();
     }
 
-    public function updatingFinanceAccountFilter()
+    public function updatedFinanceAccountFilter()
     {
         $this->resetPage();
+        $this->loadStatistics();
     }
 
-    public function updatingVoteheadFilter()
+    public function updatedVoteheadFilter()
     {
         $this->resetPage();
+        $this->loadStatistics();
     }
 
-    public function updatingStatusFilter()
+    public function updatedStatusFilter()
     {
         $this->resetPage();
+        $this->loadStatistics();
     }
 
-    public function updatingYearFilter()
+    public function updatedYearFilter()
     {
         $this->resetPage();
+        $this->loadStatistics();
     }
 
-    public function updatingTermFilter()
+    public function updatedTermFilter()
     {
         $this->resetPage();
+        $this->loadStatistics();
     }
     
     /**
@@ -506,6 +573,9 @@ class FeeAllocations extends Component
             'is_approved' => $allocation->is_approved,
         ];
         
+        // Load available voteheads for context
+        $this->updatedFormFinanceAccountId();
+        
         // Set as viewing mode (not editing)
         $this->isEditing = false;
         $this->editAllocationId = $allocationId;
@@ -520,19 +590,22 @@ class FeeAllocations extends Component
         $financeAccounts = FinanceAccount::where('is_active', true)->get();
         $voteheads = AccountVotehead::where('is_active', true)->get();
         
-        // Get all academic years (hardcoded for now)
-        $academicYears = [date('Y')-1, date('Y'), date('Y')+1];
+        // Get all academic years
+        $currentYear = (int)date('Y');
+        $academicYears = range($currentYear - 1, $currentYear + 1);
         
         // Build the query
         $allocationsQuery = FeeAllocation::query()
             ->with(['financeAccount', 'votehead']);
         
         if ($this->search) {
-            $allocationsQuery->whereHas('financeAccount', function ($query) {
-                $query->where('name', 'like', "%{$this->search}%");
-            })->orWhereHas('votehead', function ($query) {
-                $query->where('name', 'like', "%{$this->search}%");
-            })->orWhere('description', 'like', "%{$this->search}%");
+            $allocationsQuery->where(function($q) {
+                $q->whereHas('financeAccount', function ($subq) {
+                    $subq->where('name', 'like', "%{$this->search}%");
+                })->orWhereHas('votehead', function ($subq) {
+                    $subq->where('name', 'like', "%{$this->search}%");
+                })->orWhere('description', 'like', "%{$this->search}%");
+            });
         }
         
         if ($this->financeAccountFilter) {
@@ -568,7 +641,7 @@ class FeeAllocations extends Component
             'financeAccounts' => $financeAccounts,
             'voteheads' => $voteheads,
             'academicYears' => $academicYears,
-            'terms' => [1, 2, 3], // Hardcoded terms
+            'terms' => [1, 2, 3],
         ]);
     }
 } 

@@ -75,13 +75,29 @@ class StudentArrears extends Component
         // For parent users, get their children's IDs
         if ($this->isParent) {
             $userId = Auth::id();
-            $this->parentChildren = StudentRecord::where('my_parent_id', $userId)
+            $this->parentChildren = StudentRecord::where('parent_id_no', $userId)
                 ->pluck('id')
                 ->toArray();
         }
         
-        // For student users, preselect themselves
-        if ($this->isStudent) {
+        // Check for specific view types
+        $viewType = request()->input('view_type');
+        
+        // Handle parent's "my children" view
+        if ($viewType === 'my_children' && $this->isParent) {
+            // If parent only has one child, automatically select that child
+            if (count($this->parentChildren) === 1) {
+                $this->student_id = $this->parentChildren[0];
+                $this->updatedStudentId();
+            }
+        }
+        // Handle student's "my arrears" view
+        elseif ($viewType === 'my_arrears' && $this->isStudent) {
+            $this->student_id = StudentRecord::where('user_id', Auth::id())->value('id');
+            $this->updatedStudentId();
+        }
+        // Default behavior for student users
+        elseif ($this->isStudent) {
             $this->student_id = StudentRecord::where('user_id', Auth::id())->value('id');
             $this->updatedStudentId();
         }
@@ -349,7 +365,7 @@ class StudentArrears extends Component
         try {
             // Get students from the selected class
             $students = StudentRecord::where('my_class_id', $this->selectedClass)
-                ->where('is_active', true)
+    
                 ->get();
                 
             $arrearsCount = 0;
@@ -457,7 +473,7 @@ class StudentArrears extends Component
                     $qry->where('description', 'like', "%{$this->search}%")
                         ->orWhere('amount', 'like', "%{$this->search}%")
                         ->orWhereHas('student', function ($q) {
-                            $q->where('name', 'like', "%{$this->search}%")
+                            $q->where('first_name', 'like', "%{$this->search}%")
                                 ->orWhere('admission_number', 'like', "%{$this->search}%");
                         });
                 });
@@ -469,13 +485,13 @@ class StudentArrears extends Component
         
         if ($this->isAdmin || $this->isAccountant) {
             // Admins/accountants see all active students
-            $students = StudentRecord::where('is_active', true)
-                ->orderBy('name')
+            $students = StudentRecord::orderBy('first_name')
+            
                 ->get();
         } elseif ($this->isParent) {
             // Parents only see their children
             $students = StudentRecord::whereIn('id', $this->parentChildren)
-                ->orderBy('name')
+                ->orderBy('first_name')
                 ->get();
         }
         

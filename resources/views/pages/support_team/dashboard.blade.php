@@ -6,8 +6,8 @@
     showWelcome: true,
     stats: {
         students: {{ $totalStudents ?? 0 }},
-        teachers: {{ isset($users) ? $users->where('userType.title', 'teacher')->count() : 0 }},
-        admins: {{ isset($users) ? $users->where('userType.title', 'admin')->count() : 0 }},
+        teachers: {{ isset($users) ? $users->filter(function($user) { return $user->hasRole('teacher'); })->count() : 0 }},
+        admins: {{ isset($users) ? $users->filter(function($user) { return $user->hasRole('admin'); })->count() : 0 }},
         parents: {{ $totalParents ?? 0 }}
     }
 }" class="min-h-screen bg-gray-50 py-6">
@@ -160,6 +160,10 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Admin Charts -->
+        <livewire:dashboard.admin-charts />
+        
         @elseif(Qs::isTeacher())
         <!-- Teacher's View -->
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -189,6 +193,10 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Teacher Charts -->
+        <livewire:dashboard.teacher-charts />
+        
         @elseif(Qs::isParent())
         <!-- Parent's View -->
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -213,14 +221,48 @@
                 </div>
                 <div class="bg-gray-50 px-5 py-3 border-t border-gray-200">
                     <div class="text-sm">
-                        <a hhref="#" class="font-medium text-blue-600 hover:text-blue-900">View my children</a>
+                        <a href="#" class="font-medium text-blue-600 hover:text-blue-900">View my children</a>
                     </div>
                 </div>
             </div>
         </div>
+        
+        <!-- Parent Charts -->
+        <livewire:dashboard.parent-charts />
+        
+        @elseif(Qs::isStudent())
+        <!-- Student's View -->
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <!-- Academic Performance Card -->
+            <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 bg-blue-100 rounded-full p-3">
+                            <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">My Performance</dt>
+                                <dd class="flex items-baseline">
+                                    <div class="text-sm text-gray-900">View detailed academic performance</div>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-5 py-3 border-t border-gray-200">
+                    <div class="text-sm">
+                        <a href="#" class="font-medium text-blue-600 hover:text-blue-900">View my grades</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Student Charts -->
+        <livewire:dashboard.student-charts />
     @endif
-
-       
         </div>
     </div>
 

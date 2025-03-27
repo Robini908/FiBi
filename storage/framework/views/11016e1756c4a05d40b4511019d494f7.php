@@ -12,9 +12,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Flatpickr for datepicker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/rangePlugin.js"></script>
+    
+    <!-- ApexCharts for Livewire Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
     <!-- Styles -->
     <style>
         [x-cloak] { display: none !important; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
     </style>
     <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css', 'resources/js/app.js']); ?>
     <?php echo $__env->yieldPushContent('styles'); ?>
@@ -46,7 +57,7 @@ if (isset($__slots)) unset($__slots);
         <?php echo $__env->make('partials.sidebar', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
 
         <!-- Main content -->
-        <div class="lg:pl-64 flex flex-col flex-1">
+        <div class="md:pl-64 flex flex-col min-h-screen">
             <!-- Top nav -->
             <?php echo $__env->make('partials.header', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
 
@@ -61,6 +72,11 @@ if (isset($__slots)) unset($__slots);
                                 <h1 class="text-lg font-medium leading-6 text-gray-900">
                                     <?php echo $__env->yieldContent('page_title', 'Dashboard'); ?>
                                 </h1>
+                                
+                                <!-- Breadcrumbs section -->
+                                <div class="mt-1">
+                                    <?php echo $__env->yieldContent('breadcrumbs'); ?>
+                                </div>
                             </div>
                             <div class="mt-4 flex md:mt-0 md:ml-4">
                                 <!-- Action buttons go here -->
@@ -72,7 +88,7 @@ if (isset($__slots)) unset($__slots);
 
                 <!-- Alert section -->
                 <?php if($errors->any()): ?>
-                    <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
                         <div class="rounded-md bg-red-50 p-4">
                             <div class="flex">
                                 <div class="flex-shrink-0">
@@ -101,14 +117,14 @@ if (isset($__slots)) unset($__slots);
                 <?php echo $__env->make('partials.flash', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
 
                 <!-- Main content area -->
-                <div class="mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                     <?php echo $__env->yieldContent('content'); ?>
                 </div>
             </main>
 
             <!-- Footer -->
             <footer class="bg-white border-t border-gray-100">
-                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
                     <p class="text-center text-sm text-gray-500">
                         &copy; <?php echo e(date('Y')); ?> <?php echo e(config('app.name', 'MBUKU ERP')); ?>. All rights reserved.
                     </p>
@@ -118,6 +134,23 @@ if (isset($__slots)) unset($__slots);
     </div>
 
     <?php echo \Livewire\Mechanisms\FrontendAssets\FrontendAssets::scripts(); ?>
+
+                <script>
+                window.livewireChartsEvents = [
+                    { event: 'onPointClick', action: (point) => {
+                        window.livewire.emit('onPointClick', point);
+                    }},
+                    { event: 'onSliceClick', action: (slice) => {
+                        window.livewire.emit('onSliceClick', slice);
+                    }},
+                    { event: 'onColumnClick', action: (column) => {
+                        window.livewire.emit('onColumnClick', column);
+                    }},
+                    { event: 'onLegendItemClick', action: (item) => {
+                        window.livewire.emit('onLegendItemClick', item);
+                    }},
+                ];
+            </script>
 
     <?php echo view('components.toast-scripts')->render(); ?>
     <?php echo $__env->yieldPushContent('scripts'); ?>

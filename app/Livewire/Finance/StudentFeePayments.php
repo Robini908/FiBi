@@ -26,7 +26,14 @@ class StudentFeePayments extends Component
     public $isAccountant = false;
     public $isTeacher = false;
     public $isStudent = false;
+    public $isParent = false;
+    public $classFilter = '';
+    public $recentPayments;
+
+
     public $hasManagePermission = false;
+    public $hasPaymentPermission = false;
+    public $showPaymentForm = false;
     
     // Component properties
     public $search = '';
@@ -43,6 +50,11 @@ class StudentFeePayments extends Component
     public $totalPaymentsAmount = 0;
     public $classes = [];
     public $students = [];
+    
+    // Additional filter properties
+    public $paymentStatusFilter = '';
+    public $startDate = null;
+    public $endDate = null;
     
     // Receipt & Payment viewing properties
     public $showingReceipt = false;
@@ -143,6 +155,10 @@ class StudentFeePayments extends Component
     {
         $this->setUserRoles();
         $this->loadClasses();
+        
+        // Initialize recentPayments as an empty collection to prevent null errors
+        $this->recentPayments = collect([]);
+        
         $this->loadSummaryData();
         
         // Set default academic year to current year
@@ -160,7 +176,34 @@ class StudentFeePayments extends Component
         
         $this->payment_date = date('Y-m-d');
         
-        // Pre-fill form if student_id parameter was passed
+        // Handle different user roles
+        if ($this->isStudent) {
+            // For students, automatically select their own record
+            $studentRecord = StudentRecord::where('user_id', Auth::id())->first();
+            if ($studentRecord) {
+                $this->selectedStudentId = $studentRecord->id;
+                $this->loadStudentDetails();
+            } else {
+                // Student record not found - should not happen in normal circumstances
+                toast()->warning('Your student record was not found. Please contact administration.')->push();
+            }
+        } 
+        elseif ($this->isParent) {
+            // For parents, always load their children regardless of view type
+            $this->loadParentChildren();
+            
+            // If view_type is specified, it might contain additional parameters
+            $viewType = request()->input('view_type');
+            if ($viewType === 'my_children') {
+                // Any special handling for the my_children view can go here
+            }
+        }
+        else {
+            // For administrators and accountants, preload some students
+            $this->loadStudents(true); // true flag indicates initial load with limited results
+        }
+        
+        // Pre-fill form if student_id parameter was passed (URL parameter takes precedence)
         if (request()->has('student_id')) {
             $this->selectedStudentId = request()->input('student_id');
             $this->loadStudentDetails();
@@ -176,9 +219,14 @@ class StudentFeePayments extends Component
         $this->isAccountant = Qs::isAccountant();
         $this->isTeacher = Qs::isTeacher();
         $this->isStudent = Qs::isStudent();
+        $this->isParent = Qs::isParent();
         
         // Determine if user has permission to manage payments
         $this->hasManagePermission = $this->isAdmin || $this->isAccountant;
+        
+        // Determine if user has permission to make payments
+        // Admin, accountant, parent and student can make payments
+        $this->hasPaymentPermission = $this->isAdmin || $this->isAccountant || $this->isStudent || $this->isParent;
     }
     
     /**
@@ -198,6 +246,11 @@ class StudentFeePayments extends Component
         
         $this->totalPaymentsCount = $query->count();
         $this->totalPaymentsAmount = $query->sum('amount');
+        
+        // Load recent payments with pagination
+        $this->recentPayments = $query
+            ->latest('payment_date')
+            ->paginate(10);
     }
     
     /**
@@ -205,49 +258,43 @@ class StudentFeePayments extends Component
      */
     private function getPaymentsQuery()
     {
-        $query = StudentFeePayment::query();
-        
-        if ($this->search) {
-            $query->where('receipt_number', 'like', '%' . $this->search . '%')
-                  ->orWhereHas('student.user', function($q) {
-                      $q->where('name', 'like', '%' . $this->search . '%');
-                  });
-        }
-        
-        if ($this->filter_class) {
-            $query->whereHas('student', function($q) {
-                $q->where('my_class_id', $this->filter_class);
+        $query = StudentFeePayment::query()
+            ->with(['student.user', 'student.my_class'])
+            ->when($this->selectedStudentId, function ($query) {
+                $query->where('student_id', $this->selectedStudentId);
+            })
+            ->when($this->yearFilter, function ($query) {
+                $query->where('academic_year', $this->yearFilter);
+            })
+            ->when($this->termFilter, function ($query) {
+                $query->where('term', $this->termFilter);
+            })
+            ->when($this->paymentStatusFilter, function ($query) {
+                $this->applyStatusFilter($query, $this->paymentStatusFilter);
+            })
+            ->when($this->startDate, function ($query) {
+                $query->whereDate('payment_date', '>=', $this->startDate);
+            })
+            ->when($this->endDate, function ($query) {
+                $query->whereDate('payment_date', '<=', $this->endDate);
             });
-        }
-        
-        if ($this->yearFilter) {
-            $query->where('year', $this->yearFilter);
-        }
-        
-        if ($this->termFilter) {
-            $query->where('term', $this->termFilter);
-        }
-        
-        if ($this->filter_status) {
-            if ($this->filter_status === 'confirmed') {
-                $query->where('is_confirmed', true);
-            } elseif ($this->filter_status === 'pending') {
-                $query->where('is_confirmed', false)
-                      ->where('is_cancelled', false);
-            } elseif ($this->filter_status === 'cancelled') {
-                $query->where('is_cancelled', true);
-            }
-        }
-        
-        if ($this->payment_date) {
-            $query->whereDate('payment_date', '>=', $this->payment_date);
-        }
-        
-        if ($this->payment_date) {
-            $query->whereDate('payment_date', '<=', $this->payment_date);
-        }
-        
+
         return $query;
+    }
+    
+    /**
+     * Apply status filter to query
+     */
+    private function applyStatusFilter($query, $statusFilter)
+    {
+        if ($statusFilter === 'confirmed') {
+            $query->where('is_confirmed', true);
+        } elseif ($statusFilter === 'pending') {
+            $query->where('is_confirmed', false)
+                  ->where('is_cancelled', false);
+        } elseif ($statusFilter === 'cancelled') {
+            $query->where('is_cancelled', true);
+        }
     }
     
     /**
@@ -273,8 +320,8 @@ class StudentFeePayments extends Component
     public function resetFilters()
     {
         $this->reset([
-            'search', 'filter_class', 'yearFilter', 'termFilter',
-            'filter_status', 'payment_date'
+            'search', 'filter_class', 'classFilter', 'yearFilter', 'termFilter',
+            'filter_status', 'paymentStatusFilter', 'payment_date', 'startDate', 'endDate'
         ]);
         
         $this->resetPage();
@@ -288,6 +335,7 @@ class StudentFeePayments extends Component
     {
         $this->selectedStudentId = $studentId;
         $this->loadStudentDetails();
+        $this->loadSummaryData();
     }
     
     /**
@@ -303,32 +351,60 @@ class StudentFeePayments extends Component
     }
     
     /**
+     * Load students based on search and class filter
+     */
+    private function loadStudents($initialLoad = false)
+    {
+        $query = StudentRecord::query()
+            ->with(['user', 'my_class', 'section']) // Eager load relationships
+            ->when($this->search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('adm_no', 'like', '%' . $search . '%')
+                        ->orWhere('first_name', 'like', '%' . $search . '%')
+                        ->orWhere('last_name', 'like', '%' . $search . '%')
+                        ->orWhereHas('user', function ($userQuery) use ($search) {
+                            $userQuery->where('name', 'like', '%' . $search . '%')
+                                ->orWhere('email', 'like', '%' . $search . '%');
+                        });
+                });
+            })
+            ->when($this->classFilter, function ($query, $classId) {
+                $query->where('my_class_id', $classId);
+            });
+
+        // For initial load, limit results
+        if ($initialLoad) {
+            $this->students = $query->take(10)->get()->toArray();
+        } else {
+            $this->students = $query->get()->toArray();
+        }
+
+        // If only one student is found and we're searching, auto-select that student
+        if ($this->search && count($this->students) === 1) {
+            $this->selectedStudentId = $this->students[0]['id'];
+            $this->loadStudentDetails();
+        }
+    }
+    
+    /**
      * Load student details including fee information
      */
     public function loadStudentDetails()
     {
-        if (!$this->selectedStudentId) {
-            return;
-        }
-        
-        $this->selectedStudent = StudentRecord::with(['user', 'myClass', 'payments' => function($query) {
-            $query->where('year', $this->academic_year)
-                  ->where('term', $this->term)
-                  ->where('is_cancelled', false);
-        }])->find($this->selectedStudentId);
-        
-        if (!$this->selectedStudent) {
-            toast()->danger('Student not found')->push();
+        try {
+            $student = StudentRecord::with(['user', 'my_class', 'section'])
+                ->findOrFail($this->selectedStudentId);
+
+            $this->selectedStudent = $student;
+            $this->student_name = $student->user->name;
+            $this->student_class = $student->my_class->name;
+
+            $this->calculateFeeInformation();
+        } catch (\Exception $e) {
             $this->selectedStudentId = null;
-            return;
+            $this->selectedStudent = null;
+            toast()->warning('Failed to load student details. Please try again.')->push();
         }
-        
-        // Set student name and class for display
-        $this->student_name = $this->selectedStudent->user->name;
-        $this->student_class = $this->selectedStudent->myClass->name;
-        
-        // Calculate fee information
-        $this->calculateFeeInformation();
     }
     
     /**
@@ -339,31 +415,34 @@ class StudentFeePayments extends Component
         if (!$this->selectedStudent) {
             return;
         }
-        
-        // Get fee structure for the student's class
-        $feeStructure = FeeStructure::where('class_id', $this->selectedStudent->my_class_id)
-                                   ->where('year', $this->academic_year)
-                                   ->where('term', $this->term)
-                                   ->first();
-        
-        // Calculate total fees
-        $this->total_fees = $feeStructure ? $feeStructure->amount : 0;
-        
-        // Calculate total paid
-        $this->paid_amount = $this->selectedStudent->payments
-                               ->where('year', $this->academic_year)
-                               ->where('term', $this->term)
-                               ->where('is_confirmed', true)
-                               ->where('is_cancelled', false)
-                               ->sum('amount');
-        
-        // Calculate balance
-        $this->fee_balance = max(0, $this->total_fees - $this->paid_amount);
-        
-        // Calculate payment percentage
-        $this->paymentPercentage = $this->total_fees > 0 
-            ? min(100, round(($this->paid_amount / $this->total_fees) * 100)) 
-            : 0;
+
+        try {
+            // Get fee structure for the student's class
+            $feeStructure = FeeStructure::where('class_id', $this->selectedStudent->my_class_id)
+                ->where('academic_year', $this->academic_year)
+                ->where('term', $this->term)
+                ->first();
+
+            // Calculate total fees
+            $this->total_fees = $feeStructure ? $feeStructure->total_amount : 0;
+
+            // Calculate paid amount
+            $this->paid_amount = StudentFeePayment::where('student_id', $this->selectedStudent->id)
+                ->where('academic_year', $this->academic_year)
+                ->where('term', $this->term)
+                ->where('is_confirmed', true)
+                ->sum('amount');
+
+            // Calculate balance
+            $this->fee_balance = $this->total_fees - $this->paid_amount;
+
+            // Calculate payment percentage
+            $this->paymentPercentage = $this->total_fees > 0 
+                ? round(($this->paid_amount / $this->total_fees) * 100, 2)
+                : 0;
+        } catch (\Exception $e) {
+            toast()->warning('Failed to calculate fee information. Please try again.')->push();
+        }
     }
     
     /**
@@ -378,6 +457,9 @@ class StudentFeePayments extends Component
             toast()->danger('Payment not found')->push();
             return;
         }
+        
+        // Close any other open modals first
+        $this->closeAllModals();
         
         $this->showingReceipt = true;
     }
@@ -418,6 +500,9 @@ class StudentFeePayments extends Component
             return;
         }
         
+        // Close any other open modals first
+        $this->closeAllModals();
+        
         $this->confirmingPaymentId = $paymentId;
         $this->payment_amount = $payment->amount;
         $this->student_name = $payment->student->user->name;
@@ -439,7 +524,7 @@ class StudentFeePayments extends Component
         
         if (!$payment) {
             toast()->danger('Payment not found')->push();
-            $this->open_confirm_modal = false;
+            $this->closeConfirmModal();
             return;
         }
         
@@ -464,7 +549,7 @@ class StudentFeePayments extends Component
         }
         
         toast()->success('Payment confirmed successfully')->push();
-        $this->open_confirm_modal = false;
+        $this->closeConfirmModal();
     }
     
     /**
@@ -488,6 +573,9 @@ class StudentFeePayments extends Component
             toast()->info('This payment is already cancelled')->push();
             return;
         }
+        
+        // Close any other open modals first
+        $this->closeAllModals();
         
         $this->cancellingPaymentId = $paymentId;
         $this->payment_amount = $payment->amount;
@@ -514,7 +602,7 @@ class StudentFeePayments extends Component
         
         if (!$payment) {
             toast()->danger('Payment not found')->push();
-            $this->open_cancel_modal = false;
+            $this->closeCancelModal();
             return;
         }
         
@@ -533,7 +621,7 @@ class StudentFeePayments extends Component
         }
         
         toast()->success('Payment cancelled successfully')->push();
-        $this->open_cancel_modal = false;
+        $this->closeCancelModal();
     }
     
     /**
@@ -558,6 +646,9 @@ class StudentFeePayments extends Component
             return;
         }
         
+        // Close any other open modals first
+        $this->closeAllModals();
+        
         $this->editingPaymentId = $paymentId;
         $this->editData = [
             'amount' => $payment->amount,
@@ -577,193 +668,330 @@ class StudentFeePayments extends Component
         $this->editingPaymentId = null;
         $this->editData = [];
         $this->editReason = '';
+        $this->resetValidation(['editReason', 'editData.*']);
     }
     
     /**
-     * Process payment update
+     * Close all modals to prevent conflicts
      */
-    public function updatePayment()
+    private function closeAllModals()
     {
-        if (!$this->hasManagePermission) {
-            toast()->danger('You do not have permission to edit payments')->push();
-            return;
-        }
+        $this->open_confirm_modal = false;
+        $this->open_cancel_modal = false;
+        $this->showingEditModal = false;
+        $this->showingReceipt = false;
         
-        $this->validate([
-            'editData.amount' => 'required|numeric|min:1',
-            'editData.payment_date' => 'required|date',
-            'editData.notes' => 'nullable|string|max:500',
-            'editReason' => 'required|min:3|max:255'
-        ]);
+        $this->confirmingPaymentId = null;
+        $this->cancellingPaymentId = null;
+        $this->editingPaymentId = null;
+        $this->receipt = null;
         
-        $payment = StudentFeePayment::find($this->editingPaymentId);
+        $this->confirmationNote = '';
+        $this->cancellation_reason = '';
+        $this->editReason = '';
+        $this->editData = [];
         
-        if (!$payment) {
-            toast()->danger('Payment not found')->push();
-            $this->closeEditModal();
-            return;
-        }
-        
-        // Add audit trail
-        $auditNote = "EDITED: " . now()->format('Y-m-d H:i:s') . " by " . Auth::user()->name . 
-                    " (ID: " . Auth::id() . ")\nReason: " . $this->editReason . 
-                    "\nPrevious values: Amount: " . $payment->amount . ", Date: " . 
-                    $payment->payment_date->format('Y-m-d');
-        
-        // Update payment
-        $payment->amount = $this->editData['amount'];
-        $payment->payment_date = $this->editData['payment_date'];
-        $payment->notes = $this->editData['notes'] ? 
-                         ($payment->notes ? $payment->notes . "\n\n" . $auditNote : $auditNote . "\n\n" . $this->editData['notes']) : 
-                         ($payment->notes ? $payment->notes . "\n\n" . $auditNote : $auditNote);
-        $payment->save();
-        
-        // Refresh student data if we're viewing that student
-        if ($this->selectedStudentId && $payment->student_id == $this->selectedStudentId) {
-            $this->loadStudentDetails();
-        } else {
-            $this->loadSummaryData();
-        }
-        
-        toast()->success('Payment updated successfully')->push();
-        $this->closeEditModal();
+        $this->resetValidation();
+    }
+
+    /**
+     * Return the state of the cancel modal for Alpine.js
+     */
+    public function showingCancelModal()
+    {
+        return $this->open_cancel_modal;
     }
     
     /**
-     * Save new payment
+     * Show cancel payment modal
+     */
+    public function showCancelModal($paymentId)
+    {
+        $this->cancelPayment($paymentId);
+    }
+    
+    /**
+     * Close cancel payment modal
+     */
+    public function closeCancelModal()
+    {
+        $this->open_cancel_modal = false;
+        $this->cancellingPaymentId = null;
+        $this->cancellation_reason = '';
+        $this->resetValidation(['cancellation_reason']);
+    }
+
+    /**
+     * Return the state of the confirm modal for Alpine.js
+     */
+    public function showingConfirmModal()
+    {
+        return $this->open_confirm_modal;
+    }
+
+    /**
+     * Return the state of the edit modal for Alpine.js
+     */
+    public function showingEditModal()
+    {
+        return $this->showingEditModal;
+    }
+
+    /**
+     * Close confirm payment modal
+     */
+    public function closeConfirmModal()
+    {
+        $this->open_confirm_modal = false;
+        $this->confirmingPaymentId = null;
+        $this->confirmationNote = '';
+        $this->resetValidation(['confirmationNote']);
+    }
+
+    /**
+     * Alias for processConfirmPayment to match the view's method name
+     */
+    public function confirmPaymentAction()
+    {
+        $this->processConfirmPayment();
+    }
+
+    /**
+     * Handle the cancel payment action from the modal 
+     * This is needed because wire:click="cancelPayment" in the view
+     * conflicts with the cancelPayment($paymentId) method
+     */
+    public function processCancelPaymentAction()
+    {
+        $this->processCancelPayment();
+    }
+
+    /**
+     * Open the payment form
+     */
+    public function openPaymentForm()
+    {
+        if(!$this->selectedStudentId) {
+            toast()->warning('Please select a student first')->push();
+            return;
+        }
+        
+        if(!$this->hasPaymentPermission) {
+            toast()->danger('You do not have permission to make payments')->push();
+            return;
+        }
+        
+        $this->showPaymentForm = true;
+    }
+
+    /**
+     * Close the payment form
+     */
+    public function closePaymentForm()
+    {
+        $this->showPaymentForm = false;
+    }
+
+    /**
+     * Save a new payment record
      */
     public function savePayment()
     {
-        if (!$this->hasManagePermission) {
-            toast()->danger('You do not have permission to create payments')->push();
+        if(!$this->hasPaymentPermission) {
+            toast()->danger('You do not have permission to make payments')->push();
             return;
         }
         
-        if (!$this->selectedStudentId) {
-            toast()->danger('No student selected')->push();
-            return;
+        // Get dynamic validation rules based on the selected payment method
+        $rules = $this->getRules();
+        
+        // Validate the form data
+        $this->validate($rules);
+        
+        try {
+            // Generate a unique receipt number
+            $receiptNumber = 'FEE-' . strtoupper(substr(md5(time() . rand(1000, 9999)), 0, 8));
+            
+            // Create new payment record
+            $payment = new StudentFeePayment();
+            $payment->student_id = $this->selectedStudentId;
+            $payment->amount = $this->amount;
+            $payment->payment_date = $this->payment_date;
+            $payment->year = $this->academic_year;
+            $payment->term = $this->term;
+            $payment->payment_method = $this->payment_method;
+            $payment->receipt_number = $receiptNumber;
+            $payment->notes = $this->notes;
+            $payment->created_by = Auth::id();
+            
+            // Set method-specific details
+            if ($this->payment_method === 'cheque') {
+                $payment->cheque_number = $this->cheque_number;
+                $payment->bank_name = $this->bank_name;
+                $payment->cheque_date = $this->cheque_date;
+            } elseif ($this->payment_method === 'bank_transfer') {
+                $payment->bank_name = $this->bank_name;
+                $payment->bank_slip_number = $this->bank_slip_number;
+                $payment->bank_branch = $this->bank_branch;
+            } elseif ($this->payment_method === 'mpesa') {
+                $payment->mpesa_transaction_id = $this->mpesa_transaction_id;
+                $payment->phone_number = $this->phone_number;
+                $payment->mpesa_transaction_time = $this->mpesa_transaction_time;
+            }
+            
+            // Determine if the payment should be auto-confirmed
+            // Administrators and accountants can make auto-confirmed payments
+            if ($this->isAdmin || $this->isAccountant) {
+                $payment->is_confirmed = true;
+                $payment->confirmed_by = Auth::id();
+                $payment->confirmed_at = now();
+                $payment->status = 'confirmed';
+            } else {
+                $payment->is_confirmed = false;
+                $payment->status = 'pending';
+            }
+            
+            // Save the payment record
+            $payment->save();
+            
+            // Handle file uploads
+            if ($this->receipt_attachment) {
+                $filename = $receiptNumber . '.' . $this->receipt_attachment->getClientOriginalExtension();
+                $path = $this->receipt_attachment->storeAs('receipts', $filename, 'public');
+                $payment->receipt_path = $path;
+                $payment->save();
+            }
+            
+            // Reset form fields
+            $this->resetFormFields();
+            
+            // Refresh student data to show updated balance
+            $this->loadStudentDetails();
+            
+            // Show success message
+            toast()->success('Payment recorded successfully')->push();
+            
+            // Close the payment form
+            $this->closePaymentForm();
+            
+        } catch (\Exception $e) {
+            toast()->danger('Error recording payment: ' . $e->getMessage())->push();
         }
-        
-        $this->validate($this->getRules());
-        
-        // Create payment record
-        $payment = new StudentFeePayment();
-        $payment->student_id = $this->selectedStudentId;
-        $payment->receipt_number = $this->generateReceiptNumber();
-        $payment->amount = $this->amount;
-        $payment->year = $this->academic_year;
-        $payment->term = $this->term;
-        $payment->payment_date = $this->payment_date;
-        $payment->payment_method = $this->payment_method;
-        $payment->is_confirmed = $this->is_confirmed;
-        $payment->confirmed_by = $this->is_confirmed ? Auth::id() : null;
-        $payment->confirmed_at = $this->is_confirmed ? now() : null;
-        $payment->created_by = Auth::id();
-        $payment->notes = $this->notes;
-        $payment->status = $this->is_confirmed ? 'confirmed' : 'pending';
-        
-        // Set payment method specific fields
-        if ($this->payment_method === 'cheque') {
-            $payment->cheque_number = $this->cheque_number;
-            $payment->bank_name = $this->bank_name;
-            $payment->cheque_date = $this->cheque_date;
-        } elseif ($this->payment_method === 'bank_transfer') {
-            $payment->bank_name = $this->bank_name;
-            $payment->bank_slip_number = $this->bank_slip_number;
-            $payment->bank_branch = $this->bank_branch;
-        } elseif ($this->payment_method === 'mpesa') {
-            $payment->mpesa_transaction_id = $this->mpesa_transaction_id;
-            $payment->phone_number = $this->phone_number;
-            $payment->mpesa_transaction_time = $this->mpesa_transaction_time;
-        }
-        
-        // Save receipt attachment if provided
-        if ($this->receipt_attachment) {
-            $filename = 'receipt_' . time() . '_' . Str::random(10) . '.' . $this->receipt_attachment->getClientOriginalExtension();
-            $path = $this->receipt_attachment->storeAs('receipts', $filename, 'public');
-            $payment->receipt_attachment = $path;
-        }
-        
-        $payment->save();
-        
-        // Refresh student data
-        $this->loadStudentDetails();
-        
-        // Reset form fields
-        $this->resetFormFields();
-        
-        toast()->success('Payment recorded successfully')->push();
     }
-    
+
     /**
-     * Generate a unique receipt number
-     */
-    private function generateReceiptNumber()
-    {
-        $prefix = 'RCPT';
-        $date = date('Ymd');
-        $random = strtoupper(Str::random(4));
-        
-        return $prefix . $date . $random;
-    }
-    
-    /**
-     * Reset form fields after submission
+     * Reset form fields after payment submission
      */
     private function resetFormFields()
     {
-        $this->reset([
-            'amount', 'payment_method', 'cheque_number',
-            'bank_name', 'cheque_date', 'bank_slip_number', 'bank_branch',
-            'mpesa_transaction_id', 'phone_number', 'mpesa_transaction_time', 
-            'notes', 'receipt_attachment', 'is_confirmed'
-        ]);
-        
-        // Set defaults
-        $this->payment_date = date('Y-m-d');
+        $this->amount = null;
         $this->payment_method = 'cash';
-        $this->is_confirmed = false;
+        $this->cheque_number = null;
+        $this->bank_name = null;
+        $this->cheque_date = null;
+        $this->bank_slip_number = null;
+        $this->bank_branch = null;
+        $this->mpesa_transaction_id = null;
+        $this->phone_number = null;
+        $this->mpesa_transaction_time = null;
+        $this->notes = null;
+        $this->receipt_attachment = null;
         
-        // Reset validation
+        // Reset validation errors
         $this->resetValidation();
     }
-    
+
     /**
-     * Export payments to CSV
+     * Load parent's children from the database
      */
-    public function exportPayments()
+    private function loadParentChildren()
     {
-        if (!$this->hasManagePermission) {
-            toast()->danger('You do not have permission to export payments')->push();
+        $parentId = Auth::id();
+        
+        // Find all children associated with this parent
+        $children = StudentRecord::whereHas('user')
+            ->where('parent_id_no', $parentId)
+            ->with(['user', 'myClass'])
+            ->get();
+            
+        if ($children->isEmpty()) {
+            $this->students = [];
+            
+            // Add a detailed toast notification with instructions
+            toast()
+                ->info('No children are associated with your account. Please contact the school administration to link your children to your account.')
+                ->push();
             return;
         }
         
-        // The export functionality would be implemented here
-        // For now, we'll just show a toast
-        toast()->info('Export functionality will be implemented soon')->push();
+        // Transform student records to simple array format
+        $this->students = $children->map(function ($student) {
+            return [
+                'id' => $student->id,
+                'name' => $student->user->name,
+                'class' => $student->myClass->name ?? 'Unknown Class',
+                'admission_number' => $student->admission_number ?? 'N/A'
+            ];
+        })->toArray();
+        
+        // If there's only one child, auto-select them
+        if (count($this->students) === 1) {
+            $this->selectedStudentId = $this->students[0]['id'];
+            $this->loadStudentDetails();
+        }
     }
-    
+
     public function render()
     {
-        $paymentsQuery = $this->getPaymentsQuery();
-        
-        // Get previous payments for the selected student if any
-        $previous_payments = $this->selectedStudentId 
-            ? StudentFeePayment::where('student_id', $this->selectedStudentId)
-                             ->where('year', $this->academic_year)
-                             ->where('term', $this->term)
-                             ->orderBy('payment_date', 'desc')
-                             ->get()
-            : collect([]);
-        
-        // Get all payments for the table view
-        $payments = $paymentsQuery->with(['student.user', 'student.myClass'])
-                               ->latest('payment_date')
-                               ->paginate(10);
-        
         return view('livewire.finance.student-fee-payments', [
-            'payments' => $payments,
-            'previous_payments' => $previous_payments,
+            'payments' => $this->recentPayments
         ]);
+    }
+
+    // Update the search property to trigger real-time search
+    public function updatedSearch()
+    {
+        $this->loadStudents(false);
+    }
+
+    // Update the classFilter property to trigger real-time filtering
+    public function updatedClassFilter()
+    {
+        $this->loadStudents(false);
+    }
+
+    // Add real-time validation for date range
+    public function updatedStartDate($value)
+    {
+        if ($this->endDate && $value > $this->endDate) {
+            $this->addError('startDate', 'Start date cannot be later than end date');
+            return;
+        }
+        $this->loadSummaryData();
+    }
+
+    public function updatedEndDate($value)
+    {
+        if ($this->startDate && $value < $this->startDate) {
+            $this->addError('endDate', 'End date cannot be earlier than start date');
+            return;
+        }
+        $this->loadSummaryData();
+    }
+
+    // Add methods to handle real-time filter updates
+    public function updatedYearFilter()
+    {
+        $this->loadSummaryData();
+    }
+
+    public function updatedTermFilter()
+    {
+        $this->loadSummaryData();
+    }
+
+    public function updatedPaymentStatusFilter()
+    {
+        $this->loadSummaryData();
     }
 } 

@@ -100,166 +100,72 @@
                 </div>
             </div>
 
-            <div class="bg-white shadow-md rounded-lg border border-gray-200 overflow-hidden">
-                <div class="px-6 py-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-                    <div class="flex items-start">
-                        <div class="flex-shrink-0 bg-blue-100 rounded-full p-2">
-                            <i class="fas fa-clipboard-check text-blue-600"></i>
-                        </div>
-                        <div class="ml-4">
-                            <h3 class="text-lg font-medium text-gray-800">
-                                Transition Summary
-                            </h3>
-                            <p class="mt-1 text-sm text-gray-600">
-                                You're about to transition <button type="button" @click="showStudentSidebar = true" class="font-medium text-blue-600 hover:text-blue-800 underline">{{ count($selectedStudents) }} student(s)</button>.
-                                Please verify all details before proceeding.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                @if (!$targetClass && $transitionType !== 'repetition')
-                    <div class="px-6 py-4 bg-yellow-50 border-b border-yellow-200">
-                        <div class="flex items-start">
-                            <div class="flex-shrink-0 bg-yellow-100 rounded-full p-2">
-                                <i class="fas fa-exclamation-triangle text-yellow-600"></i>
-                            </div>
-                            <div class="ml-4">
-                                <h3 class="text-base font-medium text-yellow-800">
-                                    Cannot Complete Transition
-                                </h3>
-                                <p class="mt-1 text-sm text-yellow-700">
-                                    @if ($transitionType === 'promotion')
-                                        <span class="font-medium">No higher class available</span> for promotion.
-                                        The selected class is already the highest available.
-                                    @elseif ($transitionType === 'demotion')
-                                        <span class="font-medium">No lower class available</span> for demotion.
-                                        The selected class is already the lowest available.
-                                    @endif
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                <div class="px-6 py-5">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <!-- Target Class Selection -->
-                        <div>
-                            <label for="targetClass" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                                <i class="fas fa-graduation-cap text-blue-500 mr-2"></i>
-                                Target Class
-                            </label>
-                            <div class="relative mt-1">
-                                <div class="flex shadow-sm rounded-md">
-                                    <div class="relative flex-grow focus-within:z-10">
-                                        <select wire:model.live="targetClass" id="targetClass" 
-                                                class="block w-full rounded-md border-gray-300 pl-3 pr-10 py-2.5 text-base focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100 cursor-not-allowed"
-                                                disabled>
-                                            <option value="">Select Target Class</option>
-                                            @if ($targetClass)
-                                                @foreach ($classes as $class)
-                                                    @if ($class->id == $targetClass)
-                                                        <option value="{{ $class->id }}" selected>{{ $class->name }}</option>
-                                                    @endif
-                                                @endforeach
-                                            @endif
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                                            <i class="fas fa-lock text-xs"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                                <p class="mt-1.5 text-xs text-gray-500 flex items-center">
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    @if ($transitionType === 'promotion')
-                                        Automatically set to the next higher class
-                                    @elseif ($transitionType === 'demotion')
-                                        Automatically set to the previous lower class
-                                    @elseif ($transitionType === 'repetition')
-                                        Same as current class
-                                    @endif
-                                </p>
-                                @error('targetClass')
-                                    <p class="mt-1 text-sm text-red-600 flex items-center">
-                                        <i class="fas fa-exclamation-circle mr-1"></i>
-                                        {{ $errors->first('targetClass') }}
-                                    </p>
-                                @enderror
-                            </div>
-                        </div>
-                        
-                        <!-- Target Section Selection -->
-                        <div>
-                            <label for="targetSection" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                                <i class="fas fa-users text-blue-500 mr-2"></i>
-                                Target Section
-                            </label>
-                            <div class="relative mt-1">
-                                <select wire:model.live="targetSection" id="targetSection" 
-                                        class="block w-full rounded-md border-gray-300 pl-3 pr-10 py-2.5 text-base focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50 hover:bg-white transition-colors duration-200"
-                                        {{ !$targetClass ? 'disabled' : '' }}>
-                                    <option value="">-- Select Target Section --</option>
-                                    @foreach ($sections as $section)
-                                        <option value="{{ $section->id }}">{{ $section->name }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-600">
-                                    <i class="fas fa-chevron-down text-xs"></i>
-                                </div>
-                            </div>
-                            @error('targetSection')
-                                <p class="mt-1 text-sm text-red-600 flex items-center">
-                                    <i class="fas fa-exclamation-circle mr-1"></i>
-                                    {{ $errors->first('targetSection') }}
-                                </p>
-                            @enderror
-                            
-                            @if (!$targetClass)
-                                <p class="mt-1.5 text-xs text-gray-500 flex items-center">
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    Please wait for a target class to be available
-                                </p>
-                            @endif
-                        </div>
-                        
+            <!-- Main transition details -->
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+                <div class="mb-6">
+                    <h3 class="text-md font-medium text-gray-800 mb-4">Transition Information</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <!-- Transition Year -->
                         <div>
-                            <label for="transitionYear" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                                <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>
-                                Transition Year
-                            </label>
-                            <div class="relative mt-1">
+                            <label for="transitionYear" class="block text-sm font-medium text-gray-700 mb-1">Transition Year</label>
+                            <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <i class="fas fa-calendar-alt text-gray-400"></i>
                                 </div>
-                                <input wire:model="transitionYear" 
-                                       type="text" 
-                                       id="transitionYear"
-                                       class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-3 py-2.5 sm:text-sm border-gray-300 rounded-md bg-gray-100 cursor-not-allowed" 
-                                       value="{{ now()->year }}" 
-                                       readonly>
+                                <input type="text" wire:model="transitionYear" id="transitionYear" 
+                                    class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="e.g., {{ date('Y') }}">
                             </div>
-                            <p class="mt-1.5 text-xs text-gray-500 flex items-center">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Current academic year
+                            <p class="mt-1 text-xs text-gray-500">Current academic year of the students</p>
+                            @error('transitionYear') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+                        
+                        <!-- Target Academic Year (calculated) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Target Academic Year</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-calendar-check text-gray-400"></i>
+                                </div>
+                                <input type="text" readonly 
+                                    class="block w-full pl-10 pr-3 py-2 border border-gray-300 bg-gray-50 rounded-md shadow-sm text-gray-700"
+                                    value="{{ $transitionType === 'repetition' ? $transitionYear : $transitionYear + 1 }}">
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">
+                                @if($transitionType === 'repetition')
+                                    Same year for repetition
+                                @else
+                                    Next academic year after transition
+                                @endif
                             </p>
-                            @error('transitionYear')
-                                <p class="mt-1 text-sm text-red-600 flex items-center">
-                                    <i class="fas fa-exclamation-circle mr-1"></i>
-                                    {{ $errors->first('transitionYear') }}
-                                </p>
-                            @enderror
+                        </div>
+                        
+                        <!-- Academic Period (optional) -->
+                        <div>
+                            <label for="academicPeriod" class="block text-sm font-medium text-gray-700 mb-1">Academic Period (Optional)</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-clock text-gray-400"></i>
+                                </div>
+                                <select wire:model="academicPeriod" id="academicPeriod" 
+                                    class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Select Period (Optional)</option>
+                                    <option value="Term 1">Term 1</option>
+                                    <option value="Term 2">Term 2</option>
+                                    <option value="Term 3">Term 3</option>
+                                    <option value="Semester 1">Semester 1</option>
+                                    <option value="Semester 2">Semester 2</option>
+                                </select>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Specify term or semester if applicable</p>
                         </div>
                     </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-md font-medium text-gray-800 mb-4">Class Information</h3>
                     
-                    <!-- Transition Summary Card -->
-                    @if ($targetClass)
-                        <div class="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
-                            <h3 class="text-sm font-medium text-blue-800 mb-3 flex items-center">
-                                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                                Transition Path
-                            </h3>
                             <div class="flex flex-col items-center justify-center p-3 bg-white rounded-md border border-blue-100">
                                 @php
                                     $currentClass = $classes->firstWhere('id', $selectedClass);
@@ -271,7 +177,7 @@
                                     <div class="flex items-center justify-center w-full max-w-2xl py-8"
                                          x-data="{ animateTransition: false }"
                                          x-on:play-animation.window="animateTransition = true; setTimeout(() => animateTransition = false, 3000);">
-                                        <!-- Current Class -->
+                                
                                         <div class="text-center w-1/3">
                                             <div class="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center border border-gray-300 mb-2 relative"
                                                  :class="{'transition-all duration-1000 ease-in-out transform scale-90 -translate-y-1': animateTransition}">
@@ -292,7 +198,7 @@
                                             </div>
                                             <div class="text-xs text-gray-500 mt-1"
                                                 :class="{'transition-all duration-1000 ease-in-out opacity-50': animateTransition}">
-                                                Current Class
+                                        Current Class ({{ $transitionYear }})
                                             </div>
                                         </div>
                                         
@@ -308,7 +214,7 @@
                                                     <i class="fas fa-arrow-up mr-1"></i> Promotion
                                                 </div>
                                             @elseif ($transitionType === 'demotion')
-                                                <div class="h-0.5 w-16 bg-red-300 my-8 relative">
+                                        <div class="h-0.5 w-16 bg-red-300 my-8 relative" x-ref="arrow">
                                                     <div class="absolute inset-0 bg-red-500 origin-left transform scale-x-0 transition-transform duration-1000"
                                                         :class="{'scale-x-100': animateTransition}"></div>
                                                 </div>
@@ -317,7 +223,7 @@
                                                     <i class="fas fa-arrow-down mr-1"></i> Demotion
                                                 </div>
                                             @elseif ($transitionType === 'repetition')
-                                                <div class="h-0.5 w-16 bg-amber-300 my-8 relative">
+                                        <div class="h-0.5 w-16 bg-amber-300 my-8 relative" x-ref="arrow">
                                                     <div class="absolute inset-0 bg-amber-500 origin-left transform scale-x-0 transition-transform duration-1000"
                                                         :class="{'scale-x-100': animateTransition}"></div>
                                                 </div>
@@ -328,7 +234,6 @@
                                             @endif
                                         </div>
                                         
-                                        <!-- Target Class with animation -->
                                         <div class="text-center w-1/3">
                                             <div class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-2 relative transition-all duration-1000"
                                                  :class="{
@@ -357,31 +262,17 @@
                                                     'text-emerald-600': '{{ $transitionType }}' === 'promotion',
                                                     'text-red-600': '{{ $transitionType }}' === 'demotion',
                                                     'text-amber-600': '{{ $transitionType }}' === 'repetition'
-                                                 }">Target Class</div>
+                                         }">Target Class ({{ $transitionType === 'repetition' ? $transitionYear : $transitionYear + 1 }})</div>
                                         </div>
                                     </div>
                                     
                                     <!-- Play animation button -->
                                     <button type="button" 
-                                            class="mt-2 inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                                            @click="$dispatch('play-animation')"
-                                            x-data="{ playing: false }"
-                                            @click="playing = true; setTimeout(() => playing = false, 3000);"
-                                            :disabled="playing"
-                                            :class="{'opacity-50 cursor-not-allowed': playing}">
-                                        <template x-if="!playing">
-                                            <i class="fas fa-play mr-1.5 text-blue-500"></i>
-                                        </template>
-                                        <template x-if="playing">
-                                            <svg class="animate-spin h-3 w-3 text-blue-500 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                        </template>
-                                        <span x-text="playing ? 'Animating...' : 'Visualize Transition'"></span>
+                                    @click="animateTransition = true; setTimeout(() => animateTransition = false, 3000);"
+                                    class="mt-2 inline-flex items-center px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded-full hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition-colors duration-200">
+                                <i class="fas fa-play-circle mr-1"></i> Visualize Transition
                                     </button>
                                     
-                                    <!-- Transition description -->
                                     <div class="mt-4 text-sm text-gray-700 text-center">
                                         <p>
                                             @if ($transitionType === 'promotion')
@@ -391,6 +282,8 @@
                                                 <span class="font-medium text-gray-700">{{ $currentClass->name }}</span> 
                                                 <span class="text-gray-600">to</span> 
                                                 <span class="font-medium text-emerald-600">{{ $targetClassObj->name }}</span>
+                                        <span class="text-gray-600">for the academic year</span>
+                                        <span class="font-medium text-blue-700">{{ $transitionYear + 1 }}</span>
                                             @elseif ($transitionType === 'demotion')
                                                 <span class="text-gray-600">You are demoting</span> 
                                                 <span class="font-medium text-blue-700">{{ count($selectedStudents) }} student(s)</span> 
@@ -398,76 +291,79 @@
                                                 <span class="font-medium text-gray-700">{{ $currentClass->name }}</span> 
                                                 <span class="text-gray-600">to</span> 
                                                 <span class="font-medium text-red-600">{{ $targetClassObj->name }}</span>
+                                        <span class="text-gray-600">for the academic year</span>
+                                        <span class="font-medium text-blue-700">{{ $transitionYear + 1 }}</span>
                                             @elseif ($transitionType === 'repetition')
-                                                <span class="text-gray-600">You are setting</span> 
+                                        <span class="text-gray-600">You are having</span> 
                                                 <span class="font-medium text-blue-700">{{ count($selectedStudents) }} student(s)</span> 
-                                                <span class="text-gray-600">to repeat</span> 
+                                        <span class="text-gray-600">repeat</span> 
                                                 <span class="font-medium text-amber-600">{{ $currentClass->name }}</span>
+                                        <span class="text-gray-600">for the academic year</span>
+                                        <span class="font-medium text-blue-700">{{ $transitionYear }}</span>
                                             @endif
                                         </p>
                                     </div>
                                 @endif
                             </div>
                         </div>
-                    @endif
+                
+                <!-- Reason for transition -->
+                <div class="mb-6">
+                    <h3 class="text-md font-medium text-gray-800 mb-4">Additional Information</h3>
                     
-                    <!-- Reason Textarea -->
-                    <div class="mt-8">
-                        <label for="reason" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                            <i class="fas fa-comment-alt text-blue-500 mr-2"></i>
-                            Reason
-                            @if ($transitionType !== 'promotion')
-                                <span class="text-red-500 ml-1">*</span>
-                            @endif
+                    <div>
+                        <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">
+                            Reason for {{ $transitionType === 'promotion' ? 'Promotion' : ($transitionType === 'demotion' ? 'Demotion' : 'Repetition') }}
+                            @if($transitionType !== 'promotion') <span class="text-red-500">*</span> @endif
                         </label>
-                        <div class="mt-1">
-                            <textarea 
-                                wire:model="reason" 
-                                id="reason" 
-                                rows="3" 
-                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50 hover:bg-white transition-colors duration-200"
-                                placeholder="Please provide a reason for this transition..."></textarea>
+                        <div class="relative">
+                            <div class="absolute top-3 left-3 text-gray-400">
+                                <i class="fas fa-comment-alt"></i>
+                            </div>
+                            <textarea wire:model="reason" id="reason" rows="3" 
+                                class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="{{ $transitionType === 'promotion' ? 'Optional reason for promotion' : 'Required reason for ' . $transitionType }}"></textarea>
                         </div>
-                        @if ($transitionType !== 'promotion')
-                            <p class="mt-1.5 text-xs text-red-600 flex items-center">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                A reason is required for {{ $transitionType }} transitions.
-                            </p>
-                        @else
-                            <p class="mt-1.5 text-xs text-gray-500 flex items-center">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Optional for promotions, but recommended for record-keeping.
-                            </p>
+                        <p class="mt-1 text-xs text-gray-500">
+                            @if($transitionType === 'promotion')
+                                The reason is optional for regular promotions.
+                            @elseif($transitionType === 'demotion')
+                                Please provide a valid reason for demoting these students.
+                            @elseif($transitionType === 'repetition')
+                                Please explain why these students need to repeat this class.
                         @endif
-                        @error('reason')
-                            <p class="mt-1 text-sm text-red-600 flex items-center">
-                                <i class="fas fa-exclamation-circle mr-1"></i>
-                                {{ $message }}
-                            </p>
-                        @enderror
+                        </p>
+                        @error('reason') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+                
+                <!-- Warning and information alert -->
+                <div class="mb-6">
+                    <div class="rounded-md bg-yellow-50 p-4 border border-yellow-100">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-yellow-800">Important Notice</h3>
+                                <div class="mt-2 text-sm text-yellow-700">
+                                    <p>This action will update student class assignments in the system. The changes will take effect immediately after confirmation.</p>
+                                    <p class="mt-1">Once confirmed, students will be moved to their new class/section and all related data will be updated accordingly.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     @else
-        <div class="bg-yellow-50 border border-yellow-200 rounded-lg shadow-md p-6">
+        <div class="bg-blue-50 border border-blue-100 text-blue-700 p-4 rounded-md">
             <div class="flex">
-                <div class="flex-shrink-0 bg-yellow-100 rounded-full p-3">
-                    <i class="fas fa-exclamation-triangle text-yellow-600 text-xl"></i>
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500"></i>
                 </div>
-                <div class="ml-5">
-                    <h3 class="text-lg font-medium text-yellow-800">No students selected</h3>
-                    <div class="mt-2 text-sm text-yellow-700">
-                        <p>You haven't selected any students for transition. Please go back and select at least one student to proceed.</p>
-                    </div>
-                    <div class="mt-4">
-                        <button type="button" 
-                                @click="activeStep = 3"
-                                class="inline-flex items-center px-4 py-2 border border-yellow-300 shadow-sm text-sm font-medium rounded-md text-yellow-700 bg-white hover:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200">
-                            <i class="fas fa-arrow-left mr-2"></i>
-                            Go Back to Student Selection
-                        </button>
-                    </div>
+                <div class="ml-3">
+                    <p class="text-sm">Please go back and select students to transition.</p>
                 </div>
             </div>
         </div>

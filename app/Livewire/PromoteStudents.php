@@ -25,6 +25,7 @@ class PromoteStudents extends Component
     public $targetSection;
     public $transitionType = 'promotion';
     public $transitionYear;
+    public $academicPeriod;
     public $reason;
 
     // Add debug property to track student count
@@ -42,6 +43,7 @@ class PromoteStudents extends Component
         'targetClass' => 'required|exists:my_classes,id',
         'targetSection' => 'required|exists:sections,id',
         'transitionYear' => 'required|date_format:Y',
+        'academicPeriod' => 'nullable|string|max:50',
         'reason' => 'nullable|string',
     ];
 
@@ -80,18 +82,26 @@ class PromoteStudents extends Component
 
         // Filter students who have not been transitioned in the same year for the selected transition type
         $students = collect([]);
+        // Default target academic year to the next year
+        $targetAcademicYear = ($this->transitionYear ?? now()->year) + 1;
         
         if ($this->selectedSection) {
+            // Determine the target academic year based on transition type
+            $targetAcademicYear = $this->transitionType === 'repetition' 
+                ? $this->transitionYear 
+                : $this->transitionYear + 1;
+            
+            // Get students from the selected section who haven't been transitioned yet
             $students = StudentRecord::where('section_id', $this->selectedSection)
-            ->whereDoesntHave('transitions', function ($query) {
-                $query->where('transition_year', $this->transitionYear)
-                        ->whereIn('transition_type', ['promotion', 'demotion', 'repetition']);
-            })
-            ->where(function ($query) {
-                $query->where('first_name', 'like', '%' . $this->search . '%')
-                    ->orWhere('last_name', 'like', '%' . $this->search . '%')
-                    ->orWhere('adm_no', 'like', '%' . $this->search . '%');
-            })
+                ->whereDoesntHave('transitions', function ($query) use ($targetAcademicYear) {
+                    $query->where('to_academic_year', $targetAcademicYear)
+                          ->where('is_active', true);
+                })
+                ->where(function ($query) {
+                    $query->where('first_name', 'like', '%' . $this->search . '%')
+                        ->orWhere('last_name', 'like', '%' . $this->search . '%')
+                        ->orWhere('adm_no', 'like', '%' . $this->search . '%');
+                })
                 ->paginate(10);
             
             // Debug information
@@ -100,13 +110,15 @@ class PromoteStudents extends Component
                 'student_count' => $students->count(),
                 'total_students' => $students->total(),
                 'search_term' => $this->search,
+                'target_academic_year' => $targetAcademicYear,
             ];
             
             Log::info('Students query executed', [
                 'section_id' => $this->selectedSection,
                 'student_count' => $students->count(),
                 'total' => $students->total(),
-                'search' => $this->search
+                'search' => $this->search,
+                'target_academic_year' => $targetAcademicYear,
             ]);
         }
 
@@ -202,6 +214,13 @@ class PromoteStudents extends Component
         $this->validate();
 
         try {
+            // Initialize counters and variables
+            $successfulTransitions = 0;
+            $fromAcademicYear = $this->transitionYear;
+            $toAcademicYear = $this->transitionType === 'repetition' 
+                ? $this->transitionYear 
+                : $this->transitionYear + 1;
+            
             // Log the transition process for debugging
             Log::info('Transitioning students:', [
                 'selectedStudents' => $this->selectedStudents,
@@ -209,6 +228,8 @@ class PromoteStudents extends Component
                 'targetSection' => $this->targetSection,
                 'transitionYear' => $this->transitionYear,
                 'transitionType' => $this->transitionType,
+                'fromAcademicYear' => $fromAcademicYear,
+                'toAcademicYear' => $toAcademicYear,
             ]);
 
             // Validation 1: Ensure at least one student is selected
@@ -309,7 +330,7 @@ class PromoteStudents extends Component
 
             // Validation 6: Ensure no duplicate transitions for the same student in the same year
             $existingTransitions = StudentTransition::whereIn('student_id', $this->selectedStudents)
-                ->where('transition_year', $this->transitionYear)
+                ->where('to_academic_year', $toAcademicYear)
                 ->where('transition_type', $this->transitionType)
                 ->exists();
 
@@ -320,7 +341,7 @@ class PromoteStudents extends Component
                 return;
             }
 
-            // Validation 9: Ensure the user is an admin or teacher
+            // Validation for permissions
             if (!in_array(auth()->user()->user_type, ['admin', 'teacher', 'super_admin'])) {
                 toast()
                     ->danger('You do not have permission to transition students.')
@@ -328,7 +349,7 @@ class PromoteStudents extends Component
                 return;
             }
 
-            // Validation 10: Ensure the reason is provided if the transition type is not standard promotion
+            // Validation for required reason on non-standard promotions
             if (empty($this->reason) && $this->transitionType !== 'promotion') {
                 toast()
                     ->danger('A reason is required for ' . $this->transitionType . '.')
@@ -338,16 +359,30 @@ class PromoteStudents extends Component
 
             // Create a transition record for each selected student
             foreach ($this->selectedStudents as $studentId) {
-                StudentTransition::create([
-                    'student_id' => $studentId,
-                    'transition_year' => $this->transitionYear,
+                $student = StudentRecord::find($studentId);
+                if (!$student) {
+                    continue;
+                }
+                
+                // Create the transition with automatic application
+                $transition = $student->createTransition([
+                    'from_academic_year' => $fromAcademicYear,
+                    'to_academic_year' => $toAcademicYear,
+                    'from_class_id' => $this->selectedClass,
+                    'from_section_id' => $student->section_id,
+                    'to_class_id' => $this->targetClass,
+                    'to_section_id' => $this->targetSection,
                     'transition_type' => $this->transitionType,
-                    'target_class_id' => $this->targetClass,
-                    'target_section_id' => $this->targetSection,
+                    'is_active' => true,
                     'reason' => $this->reason,
-                    'decision_by' => auth()->id(),
-                    'decision_date' => now(),
+                    'created_by' => auth()->id(),
+                    'effective_date' => now(),
+                    'academic_period' => $this->academicPeriod,
                 ]);
+                
+                if ($transition) {
+                    $successfulTransitions++;
+                }
             }
 
             // Display a success message using Toast
@@ -358,13 +393,13 @@ class PromoteStudents extends Component
             $icon = '';
             
             if ($this->transitionType === 'promotion') {
-                $message = count($this->selectedStudents) . ' student(s) promoted from ' . $currentClass->name . ' to ' . $targetClass->name . ' successfully.';
+                $message = $successfulTransitions . ' student(s) promoted from ' . $currentClass->name . ' to ' . $targetClass->name . ' successfully.';
                 $icon = '<i class="fas fa-arrow-up mr-2"></i>';
             } elseif ($this->transitionType === 'demotion') {
-                $message = count($this->selectedStudents) . ' student(s) demoted from ' . $currentClass->name . ' to ' . $targetClass->name . ' successfully.';
+                $message = $successfulTransitions . ' student(s) demoted from ' . $currentClass->name . ' to ' . $targetClass->name . ' successfully.';
                 $icon = '<i class="fas fa-arrow-down mr-2"></i>';
             } elseif ($this->transitionType === 'repetition') {
-                $message = count($this->selectedStudents) . ' student(s) set to repeat ' . $currentClass->name . ' successfully.';
+                $message = $successfulTransitions . ' student(s) set to repeat ' . $currentClass->name . ' successfully.';
                 $icon = '<i class="fas fa-redo mr-2"></i>';
             }
             

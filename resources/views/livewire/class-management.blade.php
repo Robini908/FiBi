@@ -1,793 +1,298 @@
-<div>
-
+<div class="min-h-full bg-gray-100">
+    <div class="py-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Header with title and action button -->
+            @include('livewire.partials.class-management.header')
+            
+            <!-- Filters for classes -->
+            @include('livewire.partials.class-management.filters')
+            
+            <!-- Main Content Area -->
+            <div class="space-y-6">
     @if ($showForm)
-        <div class="card p-3 shadow-lg border rounded" style="background: linear-gradient(135deg, #f8f9fa, #e9ecef);">
-            <div class="card-header">
-                <h4>{{ $isEditing ? 'Edit Class' : 'Add New Class' }}</h4>
-            </div>
-            <div class="card-body">
-                <form wire:submit.prevent="saveClass">
-                    <!-- Loading Indicator -->
-                    @if ($loading)
-                        <div class="text-center mb-3">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="sr-only">Loading...</span>
-                            </div>
-                            <p>Saving class, please wait...</p>
-                        </div>
-                    @endif
-
-                    <!-- Class Name -->
-                    <div class="form-group">
-                        <label for="name">Class Name</label>
-                        <input type="text" id="name" wire:model.live="name" class="form-control"
-                            placeholder="Enter class name">
-                        @error('name')
-                            <span class="text-danger">{{ $message }}</span>
-                        @enderror
-                    </div>
-
-                    <!-- Streams Section -->
-                    <div class="mt-4">
-                        <h5>Streams for {{ $name ?: 'this class' }}</h5>
-                        <p class="text-muted">You can add one or more streams to this class.</p>
-
-                        <!-- Add Stream Input Section -->
-                        <div class="input-group mb-3">
-                            <input type="text" wire:model.live="streamName" class="form-control"
-                                placeholder="Add New Stream" @if ($streamEditMode) disabled @endif>
-                            <div class="input-group-append">
-                                <button type="button" wire:click="addStream" class="btn btn-primary"
-                                    @if ($streamEditMode) disabled @endif>
-                                    <i class="fa fa-plus"></i> Add Stream
+                    <!-- Class Form -->
+                    @include('livewire.partials.class-management.class-form')
+                @elseif ($isViewingClassTeacher)
+                    <!-- Class Master View -->
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg font-medium text-gray-900">
+                                    Class Teachers for {{ $class->name }}
+                                </h3>
+                                <button 
+                                    wire:click="$set('isViewingClassTeacher', false)" 
+                                    class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                >
+                                    <svg class="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Close
                                 </button>
                             </div>
                         </div>
-                        @error('streamName')
-                            <span class="text-danger">{{ $message }}</span>
-                        @enderror
-
-
-                        @if (empty($streams))
-                            <div class="alert alert-info">
-                                No streams added yet. Start by adding a stream for this class.
-                            </div>
-                        @endif
-
-                        <!-- Streams List -->
-                        @if ($streams)
-                            <ul class="list-group mt-3">
-                                @foreach ($streams as $index => $stream)
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <span>{{ $stream['name'] }}</span>
-                                            @if ($streamEditMode && $selectedStream === $index)
-                                                <div class="mt-2">
-                                                    <input type="text" wire:model.live="streamName"
-                                                        class="form-control" placeholder="Edit Stream Name">
-                                                    @error('streamName')
-                                                        <span class="text-danger">{{ $message }}</span>
-                                                    @enderror
-                                                    <button type="button" wire:click="updateStream"
-                                                        class="btn btn-success mt-2">
-                                                        <i class="fa fa-check"></i>
-                                                    </button>
-                                                    <button type="button"
-                                                        wire:click="$set('streamEditMode', false); $set('streamName', '')"
-                                                        class="btn btn-secondary mt-2">
-                                                        <i class="fa fa-times"></i>
-                                                    </button>
-                                                </div>
-                                            @endif
-                                        </div>
-                                        <div>
-                                            <button type="button" wire:click="editStream({{ $index }})"
-                                                class="btn btn-sm btn-warning" data-toggle="tooltip"
-                                                title="Edit Stream">
-                                                <i class="fa fa-edit"></i>
-                                            </button>
-
-                                            <button type="button" wire:click="removeStream({{ $index }})"
-                                                class="btn btn-sm btn-danger" data-toggle="tooltip"
-                                                title="Remove Stream">
-                                                <i class="fa fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </div>
-
-                    <!-- Save and Cancel Buttons -->
-                    <div class="mt-4">
-                        <button type="submit" class="btn btn-success" wire:loading.attr="disabled">
-                            {{ $isEditing ? 'Update Class' : 'Save Class' }}
-                        </button>
-                        <button type="button" wire:click="resetForm" class="btn btn-secondary">
-                            Cancel
-                        </button>
-                    </div>
-                    <div wire:dirty class="alert alert-warning"
-                        style="font-size: 14px; font-weight: bold; color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; padding: 10px; margin: 10px 0;">
-                        <i class="bi bi-exclamation-circle-fill" style="margin-right: 5px; color: #856404;"></i>
-                        Unsaved changes...
-                    </div>
-                </form>
-            </div>
-        </div>
-    @endif
-    @if (!$showForm && !$isViewingClassTeacher)
-        <div class="card  p-3 shadow-lg border rounded" style="background: linear-gradient(135deg, #f8f9fa, #e9ecef);">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="card-header">
-                    <h4 class="mb-0">Classes</h4>
-                </div>
-
-                {{-- <!-- Add Class Button --> --}}
-                <button wire:click="toggleClassForm" class="btn btn-primary mb-3">
-                    {{ $editMode ? 'Cancel Edit' : 'New' }}
-                </button>
-            </div>
-
-            <div class="d-flex justify-content-start align-items-center mb-1">
-                <!-- Teacher Filter -->
-                <div class="form-group mr-2">
-                    <label for="teacherFilter" class="sr-only">Filter by Teacher</label>
-                    <select wire:model.live="teacherFilter" id="teacherFilter" class="form-control form-control-sm">
-                        <option value="">Filter by Teacher</option>
-                        @foreach ($teachers as $teacher)
-                            <option value="{{ $teacher->id }}">{{ $teacher->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Session Filter -->
-                <div class="form-group mr-2">
-                    <label for="sessionFilter" class="sr-only">Filter by Session</label>
-                    <select wire:model.live="sessionFilter" id="sessionFilter" class="form-control form-control-sm">
-                        <option value="">Filter by Session</option>
-                        @foreach ($this->getYearsRange() as $year)
-                            <option value="{{ $year }}">{{ $year }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-            </div>
-
-
-            <div class="d-flex justify-content-auto mb-3">
-                <!-- Active Filters -->
-                <div class="d-flex flex-wrap mb-2">
-                    @foreach ($activeFilters as $key => $value)
-                        <span class="badge badge-info p-2 mr-1">
-                            {{ $key }}: {{ $value }}
-                            <button type="button" wire:click="clearFilter('{{ strtolower($key) }}')"
-                                class="btn btn-secondary btn-sm p-0 ml-1" aria-label="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </span>
-                    @endforeach
-                </div>
-
-                <!-- Reset Filters Button (Visible only if filters are applied) -->
-                @if (count($activeFilters) > 0)
-                    <div class="d-flex align-items-center mb-2">
-                        <button wire:click="resetFilters" class="btn btn-sm btn-danger">
-                            <i class="fas fa-times-circle"></i> Reset Filters
-                        </button>
-                    </div>
-                @endif
-            </div>
-
-
-
-
-            <div class="card-body" style="overflow: visible;">
-                <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                    <table class="table table-bordered" style="width: 100%; table-layout: auto;">
-                        <thead class="thead-light">
-                            <tr>
-                                <th>S/N</th>
-                                <th>Class Name</th>
-                                <th class="text-center">Actions</th>
+                        
+                        <div class="px-6 py-4">
+                            @if ($hasTeachers)
+                                <div class="overflow-x-auto rounded-md border border-gray-200">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teacher Name</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
+                                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            @forelse($classes as $class)
-                                <tr>
-                                    <td>{{ $loop->index + 1 }}</td>
-                                    <td>{{ $class->name }}</td>
-                                    <td class="text-center">
-                                        <div class="btn-group dropleft">
-                                            <button type="button"
-                                                class="btn btn-outline-secondary btn-sm dropdown-toggle"
-                                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                                Actions
-                                            </button>
-                                            <div class="dropdown-menu">
-                                                <!-- Edit Button -->
-                                                <button wire:click="toggleClassForm({{ $class->id }})"
-                                                    class="dropdown-item btn btn-warning btn-sm" data-toggle="tooltip"
-                                                    title="Edit Class">
-                                                    <i class="icon-pencil"></i> Edit
-                                                </button>
-                                                <button wire:click=" viewClassMaster({{ $class->id }})"
-                                                    class="dropdown-item btn btn-warning btn-sm" data-toggle="tooltip"
-                                                    title="View Class Master">
-                                                    <i class="icon-eye"></i> View Class Master
-                                                </button>
-
-                                                <!-- Assign Teacher Button -->
-                                                {{-- <button wire:click="toggleAssignTeacher({{ $class->id }})"
-                                                    class="dropdown-item btn btn-info btn-sm" data-toggle="tooltip"
-                                                    title="{{ $class->master ? 'Change Class Teacher' : 'Assign Class Teacher' }}">
-                                                    <i class="icon-user-check"></i>
-                                                    {{ $class->master ? 'Change Class Teacher' : 'Assign Class Teacher' }}
-                                                </button> --}}
-                                                <button wire:click="toggleAssignTeacher({{ $class->id }})"
-                                                    class="dropdown-item btn btn-info btn-sm" data-toggle="tooltip"
-                                                    title="{{ $class->getTeacherForSession($class->session) ? 'Change Class Teacher' : 'Assign Class Teacher' }}">
-                                                    <i class="icon-user-check"></i>
-                                                    {{ $class->getTeacherForSession($class->session) ? 'Change Class Teacher' : 'Assign Class Teacher' }}
-                                                </button>
-
-
-                                                <!-- Other Actions -->
-                                                <button wire:click="viewStreams({{ $class->id }})"
-                                                    class="dropdown-item btn btn-info btn-sm" data-toggle="tooltip"
-                                                    title="View Streams">
-                                                    <i class="icon-eye"></i> View Streams
-                                                </button>
-                                                <button wire:click="viewEntries({{ $class->id }})"
-                                                    class="dropdown-item btn btn-info btn-sm" data-toggle="tooltip"
-                                                    title="View Entries">
-                                                    <i class="icon-list2"></i> View Entries
-                                                </button>
-                                                <button wire:click="deleteClass({{ $class->id }})"
-                                                    class="dropdown-item btn btn-danger btn-sm" data-toggle="tooltip"
-                                                    title="Delete Class">
-                                                    <i class="icon-trash"></i> Delete
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-
-
-
-                                @if ($showInlineForm && $class->id === $selectedClassForAssignment)
-                                    <tr>
-                                        <td colspan="3">
-                                            @if ($showInlineForm)
-                                                <form wire:submit.prevent="saveStreamTeacher">
-                                                    <div class="row align-items-end">
-                                                        <div class="col">
-                                                            <label for="streamTeacher">Select Teacher</label>
-                                                            <select wire:model="streamTeacher" id="streamTeacher"
-                                                                class="form-control" required>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            @foreach ($classTeachers->groupBy('pivot.session') as $session => $teachers)
+                                                @foreach ($teachers as $teacher)
+                                                    <tr class="hover:bg-gray-50">
+                                                        @if ($editingTeacherId === $teacher->id && $editingSession === $session)
+                                                            <td colspan="7" class="px-6 py-4">
+                                                                <form wire:submit.prevent="saveStreamTeacher" class="space-y-4">
+                                                                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                                                        <div>
+                                                                            <label for="streamTeacher" class="block text-sm font-medium text-gray-700">Select Teacher</label>
+                                                                            <select 
+                                                                                wire:model="streamTeacher" 
+                                                                                id="streamTeacher" 
+                                                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                                                            >
                                                                 <option value="">-- Select Teacher --</option>
-                                                                @foreach ($teachers as $teacher)
-                                                                    <option value="{{ $teacher->id }}">
-                                                                        {{ $teacher->name }}</option>
+                                                                                @foreach ($teachers as $teacherOption)
+                                                                                    <option value="{{ $teacherOption->id }}">{{ $teacherOption->name }}</option>
                                                                 @endforeach
                                                             </select>
                                                             @error('streamTeacher')
-                                                                <span class="text-danger">{{ $message }}</span>
+                                                                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                                             @enderror
                                                         </div>
 
-                                                        <div class="col">
-                                                            <label for="session">Session</label>
-                                                            <select wire:model="session" id="session"
-                                                                class="form-control" required>
+                                                                        <div>
+                                                                            <label for="session" class="block text-sm font-medium text-gray-700">Session</label>
+                                                                            <select 
+                                                                                wire:model="session" 
+                                                                                id="session" 
+                                                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                                                            >
                                                                 <option value="">-- Select Session --</option>
                                                                 @foreach (range(date('Y'), 1900) as $year)
-                                                                    <option value="{{ $year }}">
-                                                                        {{ $year }}</option>
+                                                                                    <option value="{{ $year }}">{{ $year }}</option>
                                                                 @endforeach
                                                             </select>
                                                             @error('session')
-                                                                <span class="text-danger">{{ $message }}</span>
+                                                                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                                             @enderror
                                                         </div>
-
-                                                        <div class="col-auto">
-                                                            <button type="submit" class="btn btn-success">
-                                                                Assign Teacher
-                                                            </button>
-                                                            <button type="button" wire:click="closeInlineForm"
-                                                                class="btn btn-secondary">Cancel</button>
-                                                        </div>
                                                     </div>
-                                                </form>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endif
-
-                                <!-- Streams Table -->
-                                @if ($isDisplayingStreams && $selectedClass && $selectedClass->id == $class->id)
-                                    <tr>
-                                        <td colspan="3">
-                                            <div class="mt-3 card">
-                                                <div class="card-header">
-                                                    <h5 class="mb-0">Streams for {{ $selectedClass->name }}</h5>
-                                                </div>
-                                                <div class="card-body">
-                                                    <table class="table table-sm table-bordered table-hover">
-                                                        <thead class="table-light">
-                                                            <tr>
-                                                                <th>Stream Name</th>
-                                                                <th>Stream Teacher</th>
-                                                                <th>Student Count</th>
-                                                                <th>Actions</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            @foreach ($selectedClass->sections as $stream)
-                                                                <tr key="{{ $stream->id }}">
-                                                                    <td>{{ $stream->name }}</td>
-                                                                    <td>
-                                                                        @if ($editingStreamId === $stream->id)
-                                                                            <form
-                                                                                wire:submit="assignStreamTeacher({{ $stream->id }})">
-                                                                                <label class="form-label">Current
-                                                                                    Class
-                                                                                    Teacher:
-                                                                                    <strong>{{ $stream->teacher ? $stream->teacher->name : 'Not Assigned' }}</strong></label>
-                                                                                <label class="form-label">Current
-                                                                                    Session/Year:
-                                                                                    <strong>{{ $stream->session_year }}</strong></label>
-
-                                                                                <div
-                                                                                    class="form-group d-flex align-items-center">
-                                                                                    <select
-                                                                                        wire:model.live="selectedTeacherId"
-                                                                                        class="form-control me-2"
-                                                                                        style="width: auto;">
-                                                                                        <option value="">
-                                                                                            Select
-                                                                                            Teacher</option>
-                                                                                        @foreach ($teachers as $teacher)
-                                                                                            <option
-                                                                                                value="{{ $teacher->id }}">
-                                                                                                {{ $teacher->name }}
-                                                                                            </option>
-                                                                                        @endforeach
-                                                                                    </select>
-
-                                                                                    <select
-                                                                                        wire:model.live="sessionYear"
-                                                                                        class="form-control me-2"
-                                                                                        style="width: auto;">
-                                                                                        <option value="">
-                                                                                            Select
-                                                                                            Year</option>
-                                                                                        @for ($year = date('Y'); $year >= 2000; $year--)
-                                                                                            <option
-                                                                                                value="{{ $year }}">
-                                                                                                {{ $year }}
-                                                                                            </option>
-                                                                                        @endfor
-                                                                                    </select>
-
-                                                                                    <button type="submit"
-                                                                                        class="btn btn-success me-2">Save</button>
-                                                                                    <button type="button"
-                                                                                        class="btn btn-secondary"
-                                                                                        wire:click="cancelEdit">Close</button>
-                                                                                </div>
-                                                                            </form>
-                                                                        @else
-                                                                            <span
-                                                                                class="d-block mb-1">{{ $stream->teacher ? $stream->teacher->name : 'Not Assigned' }}</span>
-                                                                        @endif
-                                                                    </td>
-                                                                    <td>{{ $stream->studentRecords->count() }}</td>
-                                                                    <td class="text-center">
-                                                                        <div class="btn-group dropleft">
-                                                                            <button type="button"
-                                                                                class="btn btn-outline-secondary btn-sm dropdown-toggle"
-                                                                                data-toggle="dropdown"
-                                                                                aria-haspopup="true"
-                                                                                aria-expanded="false">
-                                                                                Actions
-                                                                            </button>
-                                                                            <div class="dropdown-menu">
+                                                                    
+                                                                    <div class="flex justify-end space-x-2">
                                                                                 <button
-                                                                                    class="dropdown-item btn btn-info btn-sm"
-                                                                                    wire:click="editStreamTeacher({{ $stream->id }})"
-                                                                                    data-toggle="tooltip"
-                                                                                    title="{{ $stream->teacher ? 'Change Teacher' : 'Assign Teacher' }}">
-                                                                                    {{ $stream->teacher ? 'Change Class Teacher' : 'Assign Class Teacher' }}
+                                                                            type="submit" 
+                                                                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                                        >
+                                                                            Save
                                                                                 </button>
                                                                                 <button
-                                                                                    class="dropdown-item btn btn-info btn-sm"
-                                                                                    wire:click="viewStreamStudents({{ $stream->id }})"
-                                                                                    data-toggle="tooltip"
-                                                                                    title="View Students">
-                                                                                    View Students
-                                                                                </button>
-
-                                                                                <button
-                                                                                    class="dropdown-item btn btn-info btn-sm"
-                                                                                    wire:click="showStreamEntries({{ $stream->id }})"
-                                                                                    data-toggle="tooltip"
-                                                                                    title="Show Entries">
-                                                                                    Show Entries
-                                                                                </button>
-
-                                                                                <button
-                                                                                    class="dropdown-item btn btn-danger btn-sm"
-                                                                                    wire:click="deleteStream({{ $stream->id }})"
-                                                                                    data-toggle="tooltip"
-                                                                                    title="Delete Stream">
-                                                                                    Delete
+                                                                            type="button" 
+                                                                            wire:click="cancelEdit" 
+                                                                            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                                        >
+                                                                            Cancel
                                                                                 </button>
                                                                             </div>
-                                                                        </div>
+                                                                </form>
                                                                     </td>
-                                                                </tr>
-                                                            @endforeach
-                                                        </tbody>
-                                                    </table>
-                                                    <button wire:click="$set('isDisplayingStreams', false)"
-                                                        class="btn btn-secondary"
-                                                        style="margin-top: 1rem; padding: .375rem .75rem; border-radius: .25rem;">
-                                                        Close
-                                                    </button>
-                                                </div>
-
+                                                        @else
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $session }}</td>
+                                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                                <div class="flex items-center">
+                                                                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                                                                        <svg class="h-6 w-6 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div class="ml-4">
+                                                                        <div class="text-sm font-medium text-gray-900">{{ $teacher->name }}</div>
+                                                                    </div>
+                                                            </div>
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $teacher->phone ?? '--' }}</td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $teacher->gender ?? '--' }}</td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $teacher->code ?? '--' }}</td>
+                                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                                @if ($teacher->photo)
+                                                                    <img src="{{ asset($teacher->photo) }}" alt="Teacher Photo" class="h-10 w-10 rounded-full object-cover">
+                                                                @else
+                                                                    <span class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-gray-100">
+                                                                        <span class="text-xs font-medium text-gray-500">N/A</span>
+                                                                    </span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                                <div class="flex justify-end space-x-2">
+                                                                    <button 
+                                                                        wire:click="deleteTeacher({{ $teacher->id }}, '{{ $session }}')" 
+                                                                        class="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-red-600 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                                        title="Delete teacher assignment"
+                                                                    >
+                                                                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                            </button>
                                             </div>
                                         </td>
-                                    </tr>
                                 @endif
-                                <!-- Entries (Students Count) -->
-                                @if ($viewEntriesMode && $selectedClass && $selectedClass->id == $class->id)
-                                    <tr>
-                                        <td colspan="3">
-                                            <div class="mt-3 card shadow-sm rounded-lg">
-                                                <div class="card-header text-center bg-primary text-white">
-                                                    <h5 class="mb-0">Entries for {{ $selectedClass->name }}</h5>
-                                                </div>
-                                                <div class="card-body">
-                                                    <div class="row">
-                                                        <!-- Total Students & Gender Balance -->
-                                                        <div class="col-md-12 mb-4">
-                                                            <div class="card shadow-sm rounded-lg">
-                                                                <div class="card-header bg-light">
-                                                                    <strong>Total Students & Gender Balance</strong>
-                                                                </div>
-                                                                <div class="card-body">
-                                                                    <p><strong>Total Students:</strong>
-                                                                        {{ $studentsCount }}</p>
-
-                                                                    <p><strong>Gender Balance:</strong></p>
-                                                                    <ul class="list-group mb-0">
-                                                                        <!-- Male Students -->
-                                                                        <li class="list-group-item">
-                                                                            <strong>Male:
-                                                                                {{ $genderBalance['male'] }}</strong>
-                                                                            <div class="mt-2"
-                                                                                style="max-height: 150px; overflow-y: auto; font-size: 12px; line-height: 1.2;">
-                                                                                {{ $genderBalance['male_names'] }}
-                                                                            </div>
-                                                                        </li>
-
-                                                                        <!-- Female Students -->
-                                                                        <li class="list-group-item">
-                                                                            <strong>Female:
-                                                                                {{ $genderBalance['female'] }}</strong>
-                                                                            <div class="mt-2"
-                                                                                style="max-height: 150px; overflow-y: auto; font-size: 12px; line-height: 1.2;">
-                                                                                {{ $genderBalance['female_names'] }}
-                                                                            </div>
-                                                                        </li>
-                                                                    </ul>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <!-- Students Sharing Same Parent (Siblings) -->
-                                                        <!-- Parent Header Styling -->
-                                                        <div class="bg-light py-2 px-4 mb-4 rounded-lg shadow-sm">
-                                                            <strong class="text-lg font-weight-bold text-primary"
-                                                                style="color: #007bff;">Parents with more than one
-                                                                student in this school:</strong>
-                                                        </div>
-
-                                                        <div class="col-md-12 mb-4">
-                                                            <div class="row">
-                                                                @forelse ($studentsByParent as $parent)
-                                                                    <div class="col-lg-6 col-md-6 col-sm-12 mb-4">
-                                                                        <div class="bg-light p-4 rounded-lg shadow-sm">
-                                                                            <h5 class="font-weight-bold text-success">
-                                                                                {{ $parent['parent_name'] }}</h5>
-                                                                            <p><strong>Siblings:</strong></p>
-                                                                            <ul class="list-unstyled">
-                                                                                @foreach ($parent['students'] as $student)
-                                                                                    <li
-                                                                                        class="d-flex justify-content-between align-items-center mb-2">
-                                                                                        <div
-                                                                                            class="d-flex align-items-center">
-                                                                                            <strong>{{ $student['name'] }}</strong>
-                                                                                            <span
-                                                                                                class="ml-2 text-muted text-sm">|</span>
-                                                                                            <div
-                                                                                                class="position-relative ml-2">
-                                                                                                <span
-                                                                                                    class="badge badge-info"
-                                                                                                    style="background-color: #17a2b8;">{{ $student['status'] }}</span>
-                                                                                                <!-- Arrow pointing to the badge -->
-                                                                                                <span class="arrow"
-                                                                                                    style="font-size: 1.2rem; position: absolute; top: 50%; left: -20px; transform: translateY(-50%); color: #17a2b8;">→</span>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </li>
-                                                                                @endforeach
-                                                                            </ul>
-                                                                        </div>
-                                                                    </div>
-                                                                @empty
-                                                                    <div class="col-12">
-                                                                        <p class="text-center text-muted">No parents
-                                                                            with multiple students found.</p>
-                                                                    </div>
-                                                                @endforelse
-                                                            </div>
-                                                        </div>
-
-
-
-
-                                                        <!-- Close Button -->
-                                                        <div class="col-12 text-left mt-4">
-                                                            <button wire:click="$set('viewEntriesMode', false)"
-                                                                class="btn btn-secondary"
-                                                                style="margin-top: 1rem; padding: .375rem .75rem; border-radius: .25rem;">
-                                                                Close
-                                                            </button>
-                                                        </div>
-
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endif
-
-
-
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="text-center">No classes found.</td>
                                 </tr>
-                            @endforelse
+                                                @endforeach
+                                            @endforeach
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Pagination Links -->
-                <div>
-                    {{ $classes->links() }}
+                                <div class="mt-6 flex justify-between">
+                                    <button wire:click="exportPdf" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Export as PDF
+                                    </button>
+                                </div>
+                            @else
+                                <div class="text-center py-12">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900">No teachers assigned</h3>
+                                    <p class="mt-1 text-sm text-gray-500">There are no teachers assigned to this class yet.</p>
+                                    <div class="mt-6">
+                                        <button
+                                            wire:click="toggleAssignTeacher({{ $selectedClassForAssignment }})"
+                                            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        >
+                                            <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                                            </svg>
+                                            Assign Teacher
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
                 </div>
+                @else
+                    <!-- Classes Table -->
+                    @include('livewire.partials.class-management.classes-table')
+                @endif
             </div>
         </div>
-    @endif
-
+    </div>
 
     <!-- Students Modal -->
     @if ($showStudentsModal)
-        <!-- Modal backdrop -->
-        <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background: rgba(0, 0, 0, 0.5);">
-            <div class="modal-dialog modal-lg" role="document"
-                style="max-width: 90%; margin-left: auto; margin-right: auto;">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Students in {{ $modalStreamName }}</h5>
-                        <button type="button" wire:click="$set('showStudentsModal', false)" class="close"
-                            aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
+        <div class="fixed inset-0 overflow-hidden z-50" role="dialog" aria-modal="true">
+            <div class="absolute inset-0 overflow-hidden">
+                <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
+                    <div class="relative w-screen max-w-6xl">
+                        <div class="h-full flex flex-col bg-white shadow-xl overflow-y-scroll">
+                            <div class="px-4 py-6 sm:px-6 bg-gray-50 border-b border-gray-200">
+                                <div class="flex items-start justify-between">
+                                    <h2 class="text-lg font-medium text-gray-900">
+                                        Students in {{ $modalStreamName }}
+                                    </h2>
+                                    <div class="ml-3 h-7 flex items-center">
+                                        <button 
+                                            wire:click="$set('showStudentsModal', false)" 
+                                            class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <span class="sr-only">Close panel</span>
+                                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
                         </button>
                     </div>
-                    <div class="modal-body table-responsive" style="max-height: 60vh; overflow-y: auto;">
-                        <p>Total Students: {{ $modalStudentsCount }}</p>
-                        <table class="table table-striped table-bordered">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>Admission Number</th>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Gender</th>
-                                    <th>KCPE</th>
-                                    <th>Phone</th>
-                                    <th>Date of Birth</th>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-500">
+                                    Total Students: <span class="font-medium">{{ $modalStudentsCount }}</span>
+                                </p>
+                            </div>
+                            
+                            <div class="flex-1 px-4 py-6 sm:px-6 overflow-auto">
+                                <div class="border border-gray-200 rounded-md overflow-hidden">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admission Number</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KCPE</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date of Birth</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                                        <tbody class="bg-white divide-y divide-gray-200">
                                 @foreach ($modalStudents as $student)
-                                    <tr>
-                                        <td>{{ $student->adm_no }}</td>
-                                        <td>{{ $student->first_name }} {{ $student->middle_name }}
-                                            {{ $student->last_name }}</td>
-                                        <td>{{ $student->email }}</td>
-                                        <td>{{ ucfirst($student->gender) }}</td>
-                                        <td>{{ $student->kcpe }}</td>
-                                        <td>{{ $student->phone }}</td>
-                                        <td>{{ \Carbon\Carbon::parse($student->dob)->format('d M, Y') }}</td>
+                                                <tr class="hover:bg-gray-50">
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $student->adm_no }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="flex items-center">
+                                                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                                                                @if($student->photo)
+                                                                    <img class="h-10 w-10 rounded-full object-cover" src="{{ asset($student->photo) }}" alt="">
+                                                                @else
+                                                                    <svg class="h-6 w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                                    </svg>
+                                                                @endif
+                                                            </div>
+                                                            <div class="ml-4">
+                                                                <div class="text-sm font-medium text-gray-900">
+                                                                    {{ $student->first_name }} {{ $student->middle_name }} {{ $student->last_name }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->email }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ucfirst($student->gender) }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->kcpe }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->phone }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ \Carbon\Carbon::parse($student->dob)->format('d M, Y') }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" wire:click="$set('showStudentsModal', false)"
-                            class="btn btn-secondary">Close</button>
+                            </div>
+                            
+                            <div class="flex-shrink-0 px-4 py-4 sm:px-6 bg-gray-50 border-t border-gray-200">
+                                <div class="flex justify-end">
+                                    <button
+                                        wire:click="$set('showStudentsModal', false)"
+                                        class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     @endif
-    <!-- Include jQuery -->
-
-    @if ($isViewingClassTeacher)
-    <div class="card mt-3 shadow-lg rounded-lg border-2" style="border-color: #d1d5db;">
-        <div class="card-header"
-            style="background-color: #007bff; color: white; padding: 1rem; border-top-left-radius: .25rem; border-top-right-radius: .25rem;">
-            <strong>Class Teachers Information</strong>
-        </div>
-        <div class="card-body"
-            style="padding: 1.5rem; background-color: white; border-bottom-left-radius: .25rem; border-bottom-right-radius: .25rem;">
-            <!-- Flash Messages -->
-            @if (session('message'))
-                <div class="alert alert-success">
-                    {{ session('message') }}
-                </div>
-            @endif
-            @if (session('error'))
-                <div class="alert alert-danger">
-                    {{ session('error') }}
-                </div>
-            @endif
-
-            <!-- Class Information -->
-            <div class="mb-4">
-                <p style="font-size: 1.125rem; font-weight: 600; color: #4b5563;"><strong>Class:</strong>
-                    {{ $class->name }}</p>
-            </div>
-
-            <!-- Display all teachers in a Bootstrap table -->
-            @if ($hasTeachers)
-                <div class="table-responsive">
-                    <table class="table table-bordered table-striped">
-                        <thead>
-                            <tr>
-                                <th>Session</th>
-                                <th>Teacher Name</th>
-                                <th>Phone</th>
-                                <th>Gender</th>
-                                <th>Code</th>
-                                <th>Photo</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($classTeachers->groupBy('pivot.session') as $session => $teachers)
-                                @foreach ($teachers as $teacher)
-                                    <tr>
-                                        <!-- Display the inline form if this row is being edited -->
-                                        @if ($editingTeacherId === $teacher->id && $editingSession === $session)
-                                            <td colspan="7">
-                                                <form wire:submit.prevent="saveStreamTeacher">
-                                                    <div class="row align-items-end">
-                                                        <div class="col">
-                                                            <label for="streamTeacher">Select Teacher</label>
-                                                            <select wire:model="streamTeacher" id="streamTeacher" class="form-control" required>
-                                                                <option value="">-- Select Teacher --</option>
-                                                                @foreach ($teachers as $teacherOption)
-                                                                    <option value="{{ $teacherOption->id }}">{{ $teacherOption->name }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                            @error('streamTeacher')
-                                                                <span class="text-danger">{{ $message }}</span>
-                                                            @enderror
-                                                        </div>
-
-                                                        <div class="col">
-                                                            <label for="session">Session</label>
-                                                            <select wire:model="session" id="session" class="form-control" required>
-                                                                <option value="">-- Select Session --</option>
-                                                                @foreach (range(date('Y'), 1900) as $year)
-                                                                    <option value="{{ $year }}">{{ $year }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                            @error('session')
-                                                                <span class="text-danger">{{ $message }}</span>
-                                                            @enderror
-                                                        </div>
-
-                                                        <div class="col-auto">
-                                                            <button type="submit" class="btn btn-success">
-                                                                Save
-                                                            </button>
-                                                            <button type="button" wire:click="cancelEdit" class="btn btn-secondary">Cancel</button>
-                                                        </div>
-                                                    </div>
-                                                </form>
-                                            </td>
-                                        @else
-                                            <!-- Display the teacher's information -->
-                                            <td>{{ $session }}</td>
-                                            <td>{{ $teacher->name }}</td>
-                                            <td>{{ $teacher->phone ?? '--' }}</td>
-                                            <td>{{ $teacher->gender ?? '--' }}</td>
-                                            <td>{{ $teacher->code ?? '--' }}</td>
-                                            <td>
-                                                @if ($teacher->photo)
-                                                    <img src="{{ $teacher->photo }}" alt="Teacher Photo"
-                                                        style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
-                                                @else
-                                                    <span>--</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <!-- Disable Edit Button -->
-                                                {{-- <button wire:click="editTeacher({{ $teacher->id }}, '{{ $session }}')"
-                                                    class="btn btn-sm btn-primary" title="Edit">
-                                                    <i class="fas fa-edit"></i>
-                                                </button> --}}
-
-                                                <!-- Delete Button -->
-                                                <button wire:click="deleteTeacher({{ $teacher->id }}, '{{ $session }}')"
-                                                    class="btn btn-sm btn-danger" title="Delete">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        @endif
-                                    </tr>
-                                @endforeach
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @else
-                <p style="color: #ef4444; margin-top: 1rem;">No teachers assigned to this class.</p>
-            @endif
-
-            <!-- Export PDF Button -->
-            <button wire:click="exportPdf" class="btn btn-primary mt-3">
-                <i class="fas fa-download"></i> Export as PDF
-            </button>
-
-            <!-- Close Button -->
-            <button wire:click="$set('isViewingClassTeacher', false)" class="btn btn-secondary"
-                style="margin-top: 1rem; padding: .375rem .75rem; border-radius: .25rem;">
-                Close
-            </button>
-        </div>
-    </div>
-@endif
-
 </div>
 
 @script
-
 <script>
-    // Function to hide a message
-    function hideMessage(selector) {
-        $(selector).fadeOut('slow');
-    }
-
-    // Automatically hide success and error messages after 5 seconds
-    $(document).ready(function() {
-        setTimeout(function() {
-            $('#successMessage').fadeOut('slow');
-        }, 5000);
-
-        setTimeout(function() {
-            $('#errorMessage').fadeOut('slow');
-        }, 5000);
+// Only initialize Alpine data if not already done
+document.addEventListener('livewire:load', function() {
+    // Nothing here for now, as we're using x-data on individual components
     });
 </script>
 @endscript

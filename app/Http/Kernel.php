@@ -44,6 +44,7 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\VerifyAndRefreshSession::class,
             \App\Http\Middleware\FixCookieJarMiddleware::class,
+            \App\Http\Middleware\TrackUserActivity::class,
         ],
 
         'api' => [

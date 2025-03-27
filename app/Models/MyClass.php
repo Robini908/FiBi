@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\User;
+use Illuminate\Support\Str;
 use Eloquent;
 use App\Models\SubjectSelectionSetting;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class MyClass extends Model
 {
@@ -70,8 +72,8 @@ class MyClass extends Model
     public function teachers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'class_teacher', 'my_class_id', 'user_id')
-            ->whereHas('userType', function ($query) {
-                $query->where('title', 'teacher'); // Filter users by user_type = 'teacher'
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'teacher'); // Filter users by role 'teacher'
             })
             ->withPivot('session')          // Include the session column from the pivot table
             ->withTimestamps();             // Include timestamps if needed
@@ -97,8 +99,8 @@ class MyClass extends Model
     public function assignTeacherForSession(int $teacherId, string $session)
     {
         // Ensure the user is a teacher before assigning
-        $teacher = User::where('id', $teacherId)->whereHas('userType', function ($query) {
-            $query->where('title', 'teacher');
+        $teacher = User::where('id', $teacherId)->whereHas('roles', function ($query) {
+            $query->where('name', 'teacher');
         })->firstOrFail();
 
         // Attach the teacher with the session information

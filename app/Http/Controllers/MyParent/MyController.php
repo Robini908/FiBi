@@ -15,8 +15,8 @@ class MyController extends Controller
 
     public function children()
     {
-        $data['students'] = $this->student->getRecord(['my_parent_id' => Auth::user()->id])->with(['my_class', 'section'])->get();
-
+        $data['students'] = $this->student->getRecord(['parent_id_no' => Auth::user()->id])->with(['my_class', 'section'])->get();
+        $data['parent'] = Auth::user();
         return view('pages.parent.children', $data);
     }
 

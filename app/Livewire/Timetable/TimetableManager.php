@@ -603,7 +603,7 @@ class TimetableManager extends Component
             }
             
             $this->closeEntryModal();
-            $this->emit('refreshTimetable');
+            $this->dispatch('refreshTimetable');
             
         } catch (\Exception $e) {
             toast()->danger('Error: ' . $e->getMessage())->push();
@@ -622,7 +622,7 @@ class TimetableManager extends Component
             toast()->success('Timetable entry deleted successfully')->push();
             
             $this->closeEntryModal();
-            $this->emit('refreshTimetable');
+            $this->dispatch('refreshTimetable');
             
         } catch (\Exception $e) {
             toast()->danger('Error: ' . $e->getMessage())->push();

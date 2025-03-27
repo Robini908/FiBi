@@ -422,7 +422,7 @@ class Qs
     // Fetch student data fields
     public static function getStudentData($remove = [])
     {
-        $data = ['my_class_id', 'section_id', 'my_parent_id', 'dorm_id', 'dorm_room_no', 'adm_no', 'year_admitted', 'wd', 'wd_date', 'grad', 'grad_date', 'house', 'age'];
+        $data = ['my_class_id', 'section_id', 'parent_id_no', 'dorm_id', 'dorm_room_no', 'adm_no', 'year_admitted', 'wd', 'wd_date', 'grad', 'grad_date', 'house', 'age'];
         return $remove ? array_values(array_diff($data, $remove)) : $data;
     }
 
@@ -461,7 +461,7 @@ class Qs
      */
     public static function isParentOfStudent($student_id, $parent_id)
     {
-        return StudentRecord::where(['user_id' => $student_id, 'my_parent_id' => $parent_id])->exists();
+        return StudentRecord::where(['user_id' => $student_id, 'parent_id_no' => $parent_id])->exists();
     }
 
     /**
@@ -605,7 +605,7 @@ class Qs
 
     public static function findMyChildren($parent_id)
     {
-        return StudentRecord::where('my_parent_id', $parent_id)->with(['user', 'my_class'])->get();
+        return StudentRecord::where('parent_id_no', $parent_id)->with(['user', 'my_class'])->get();
     }
 
     public static function findTeacherSubjects($teacher_id)

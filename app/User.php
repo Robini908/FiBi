@@ -53,7 +53,8 @@ class User extends Authenticatable
         'email_verified_at',
         'two_factor_secret',
         'two_factor_recovery_codes',
-        'two_factor_confirmed_at'
+        'two_factor_confirmed_at',
+        'last_active_at'
     ];
 
     /**
@@ -76,6 +77,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'two_factor_confirmed_at' => 'datetime',
+        'last_active_at' => 'datetime',
     ];
 
     // Define relationships
@@ -186,6 +188,17 @@ class User extends Authenticatable
         return static::where('email', $username)
                     ->orWhere('username', $username)
                     ->first();
+    }
+
+    /**
+     * Get the user's primary role
+     * Alias for backwards compatibility with old code
+     * 
+     * @return \Spatie\Permission\Models\Role|null
+     */
+    public function userType()
+    {
+        return $this->roles->first();
     }
 
     /**
