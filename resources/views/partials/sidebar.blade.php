@@ -1,9 +1,9 @@
 <!-- Main Sidebar Container -->
-<aside class="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-100 shadow-sm overflow-y-auto transition-transform duration-300 transform md:translate-x-0 z-40" 
+<aside class="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-100 shadow-sm overflow-y-auto transition-transform duration-300 transform md:translate-x-0 z-40"
        :class="{'translate-x-0': sidebarOpen, '-translate-x-full': !sidebarOpen}"
        x-data="{ activeMenu: null }"
        x-cloak>
-    
+
     <!-- Brand Logo -->
     <div class="flex items-center justify-between h-16 bg-gradient-to-r from-green-600 to-green-700 px-4">
         <a href="{{ route('dashboard') }}" class="flex items-center space-x-2">
@@ -22,9 +22,9 @@
         <div class="flex items-center space-x-3">
             <div class="flex-shrink-0">
                 <div class="relative w-10 h-10 overflow-hidden bg-gray-200 rounded-full ring-2 ring-white">
-                    <img 
-                        class="h-full w-full object-cover" 
-                        src="{{ Auth::user()->photo ? asset(Auth::user()->photo) : asset('global_assets/images/user.png') }}" 
+                    <img
+                        class="h-full w-full object-cover"
+                        src="{{ Auth::user()->photo ? asset(Auth::user()->photo) : asset('global_assets/images/user.png') }}"
                         alt="{{ Auth::user()->name }}"
                         onerror="this.src='{{ asset('global_assets/images/user.png') }}'"
                     >
@@ -44,7 +44,7 @@
     <div class="py-4 h-full">
         <nav class="px-3 space-y-1.5">
             <!-- Dashboard -->
-            <a href="{{ route('dashboard') }}" 
+            <a href="{{ route('dashboard') }}"
                class="{{ Request::is('dashboard*') ? 'bg-green-50 text-green-700 border-l-4 border-green-500' : 'text-gray-600 hover:bg-gray-50 hover:text-green-700' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
                 <svg class="{{ Request::is('dashboard*') ? 'text-green-500' : 'text-gray-400 group-hover:text-green-500' }} mr-3 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -67,7 +67,7 @@
             <!-- Registration Section -->
             @if (Qs::isAdministratorOrTeacher() || Qs::isParent() || Qs::isStudent())
             <div class="py-1">
-                <button @click="activeMenu = activeMenu === 'registration' ? null : 'registration'" 
+                <button @click="activeMenu = activeMenu === 'registration' ? null : 'registration'"
                         class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
                     <svg class="text-gray-400 group-hover:text-green-500 mr-3 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -79,7 +79,7 @@
                             Registration
                         @endif
                     </span>
-                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150" 
+                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150"
                          :class="{'rotate-90': activeMenu === 'registration'}"
                          viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
@@ -159,7 +159,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                     <span class="flex-1 truncate">Staff Management</span>
-                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150" 
+                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150"
                          :class="{'rotate-90': activeMenu === 'staff'}"
                          viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
@@ -194,7 +194,7 @@
                             Academics
                         @endif
                     </span>
-                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150" 
+                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150"
                          :class="{'rotate-90': activeMenu === 'academics'}"
                          viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
@@ -241,6 +241,78 @@
             </div>
             @endif
 
+            <!-- Attendance Section -->
+            @if (Qs::isAcademicStaff() || Qs::isAdministrator() || Qs::isParent())
+            <div class="py-1">
+                <button @click="activeMenu = activeMenu === 'attendance' ? null : 'attendance'"
+                        class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
+                    <svg class="text-gray-400 group-hover:text-green-500 mr-3 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    <span class="flex-1 truncate">
+                        @if (Qs::isParent())
+                            Student Attendance
+                        @elseif (Qs::isStudent())
+                            My Attendance
+                        @else
+                            Attendance
+                        @endif
+                    </span>
+                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150"
+                         :class="{'rotate-90': activeMenu === 'attendance'}"
+                         viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div x-show="activeMenu === 'attendance'"
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     class="mt-1 pl-10 space-y-1">
+                    
+                    @if(Qs::isTeacher() || Qs::isAdministrator())
+                    <a href="{{ route('attendance.take') }}"
+                       class="{{ in_array(Route::currentRouteName(), ['attendance.take', 'attendance.take.class']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
+                        <span class="truncate">Take Attendance</span>
+                    </a>
+                    @endif
+                    
+                    <a href="{{ route('attendance.view') }}"
+                       class="{{ in_array(Route::currentRouteName(), ['attendance.view', 'attendance.view.class']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
+                        <span class="truncate">
+                            @if(Qs::isParent())
+                                View Student Attendance
+                            @elseif(Qs::isStudent())
+                                View My Attendance
+                            @else
+                                View Attendance
+                            @endif
+                        </span>
+                    </a>
+                    
+                    @if(!Qs::isStudent())
+                    <a href="{{ route('attendance.student.history') }}"
+                       class="{{ Route::is('attendance.student.history') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
+                        <span class="truncate">
+                            @if(Qs::isParent())
+                                Attendance History
+                            @else
+                                Student Attendance History
+                            @endif
+                        </span>
+                    </a>
+                    @endif
+                    
+                    @if(Qs::isAdministrator())
+                    <a href="{{ route('attendance.analytics') }}"
+                       class="{{ Route::is('attendance.analytics') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
+                        <span class="truncate">Attendance Analytics</span>
+                    </a>
+                    @endif
+                </div>
+            </div>
+            @endif
+
             <!-- Finance Section -->
             @if (Qs::isAdministrator() || Qs::isAdmin() || Qs::isAccountant() || Qs::isParent())
             <div class="py-1">
@@ -258,7 +330,7 @@
                             Finance
                         @endif
                     </span>
-                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150" 
+                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150"
                          :class="{'rotate-90': activeMenu === 'finance'}"
                          viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
@@ -269,39 +341,46 @@
                      x-transition:enter-start="transform opacity-0 scale-95"
                      x-transition:enter-end="transform opacity-100 scale-100"
                      class="mt-1 pl-10 space-y-1">
-                    
-                    @if (Qs::isAdministrator() || Qs::isAdmin() || Qs::isAccountant())
+
+                    @if (Qs::isAdministrativeStaff())
                     <a href="{{ route('finance.dashboard') }}"
                        class="{{ Route::is('finance.dashboard') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Finance Dashboard</span>
                     </a>
-                    
+
                     <a href="{{ route('finance.accounts') }}"
                        class="{{ Route::is('finance.accounts*') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Finance Accounts</span>
                     </a>
-                    
+
                     <a href="{{ route('finance.voteheads') }}"
                        class="{{ Route::is('finance.voteheads*') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Voteheads</span>
                     </a>
-                    
+
                     <a href="{{ route('finance.fee-allocations') }}"
                        class="{{ Route::is('finance.fee-allocations*') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Fee Allocations</span>
                     </a>
-                    
+
                     <a href="{{ route('finance.fee-structure') }}"
                        class="{{ Route::is('finance.fee-structure*') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Fee Structure</span>
                     </a>
-                    
+
                     <a href="{{ route('finance.payment-vouchers') }}"
                        class="{{ Route::is('finance.payment-vouchers*') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Payment Vouchers</span>
                     </a>
                     @endif
-                    
+
+                    @if (Qs::isStudent())
+                    <a href="{{ route('finance.fee-payment') }}"
+                       class="{{ Route::is('finance.fee-payment*') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
+                        <span class="truncate">Make Payment</span>
+                    </a>
+                    @endif
+
                     <a href="{{ Qs::isParent() ? route('finance.student-fee-payments.my-children') : route('finance.student-fee-payments') }}"
                        class="{{ in_array(Route::currentRouteName(), ['finance.student-fee-payments', 'finance.student-fee-payments.my-children']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">
@@ -314,14 +393,14 @@
                             @endif
                         </span>
                     </a>
-                    
+
                     @if (Qs::isAdministrator() || Qs::isAdmin() || Qs::isAccountant())
                     <a href="{{ route('finance.student-arrears') }}"
                        class="{{ Route::is('finance.student-arrears*') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Student Arrears</span>
                     </a>
                     @endif
-                    
+
                     @if (Qs::isParent() || Qs::isStudent())
                     <a href="{{ Qs::isParent() ? route('finance.arrears.my-children') : route('finance.arrears.my-arrears') }}"
                        class="{{ in_array(Route::currentRouteName(), ['finance.arrears.my-children', 'finance.arrears.my-arrears']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
@@ -334,7 +413,7 @@
                         </span>
                     </a>
                     @endif
-                    
+
                     @if (Qs::isParent() || Qs::isStudent())
                     <a href="{{ Qs::isParent() ? route('finance.fee-structure.view-for-children') : route('finance.fee-structure.view-for-student') }}"
                        class="{{ in_array(Route::currentRouteName(), ['finance.fee-structure.view-for-children', 'finance.fee-structure.view-for-student']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
@@ -361,7 +440,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
                     <span class="flex-1 truncate">Settings</span>
-                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150" 
+                    <svg class="text-gray-400 ml-3 h-4 w-4 transform group-hover:text-green-500 transition-colors ease-in-out duration-150"
                          :class="{'rotate-90': activeMenu === 'settings'}"
                          viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
@@ -377,7 +456,7 @@
                        class="{{ in_array(Route::currentRouteName(), ['users.index', 'users.show', 'users.edit']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Users</span>
                     </a>
-                    
+
                     <a href="{{ route('staff.manage') }}"
                        class="{{ in_array(Route::currentRouteName(), ['staff.manage']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Staff Management</span>
@@ -388,7 +467,7 @@
                        class="{{ Route::is('settings') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">Settings</span>
                     </a>
-                    
+
                     <a href="{{ route('school.settings') }}"
                        class="{{ Route::is('school.settings') ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">School Settings</span>
@@ -401,11 +480,11 @@
                 </div>
             </div>
             @endif
-            
+
             <!-- Divider -->
             <div class="py-2 mt-2">
                 <div class="h-px bg-gray-200"></div>
-                
+
                 <!-- Sign Out Link -->
                 <form method="POST" action="{{ route('logout') }}" class="pt-2">
                     @csrf
@@ -422,7 +501,7 @@
 </aside>
 
 <!-- Mobile menu backdrop -->
-<div x-show="sidebarOpen" 
-     class="fixed inset-0 z-30 bg-gray-600 bg-opacity-75 md:hidden" 
+<div x-show="sidebarOpen"
+     class="fixed inset-0 z-30 bg-gray-600 bg-opacity-75 md:hidden"
      @click="sidebarOpen = false"
      x-cloak></div>

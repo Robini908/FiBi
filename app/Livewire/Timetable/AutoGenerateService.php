@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\SchoolTimetable;
 use App\Models\Subject;
 use App\Models\StaffRecord;
+use App\User;
 
 class AutoGenerateService
 {
@@ -42,6 +43,7 @@ class AutoGenerateService
             // Initialize statistics
             $stats = [
                 'entries_created' => 0,
+                'skipped' => 0,
                 'conflicts' => 0,
                 'teacher_conflicts' => 0,
                 'category_conflicts' => 0,
@@ -389,10 +391,25 @@ class AutoGenerateService
     private function getRelevantTeacherAssignments(int $classId, ?int $sectionId = null): Collection
     {
         try {
+            // Get the timetable to extract academic session and term
+            $timetable = SchoolTimetable::find($classId);
+            $currentSession = $timetable ? $timetable->academic_session : null;
+            $currentTerm = $timetable ? $timetable->academic_term : null;
+            
+            if (!$currentSession) {
+                // Fallback to get from settings
+                $settingRepo = new \App\Repositories\SettingRepo();
+                $currentSessionSetting = $settingRepo->getSetting('current_session')->first();
+                if ($currentSessionSetting) {
+                    $currentSession = $currentSessionSetting->description;
+                }
+            }
+            
             $query = TeacherSubjectAssignment::with(['teacher', 'subject.category'])
                 ->where('class_id', $classId)
             ->where('is_active', true);
             
+            // Apply section filter if provided
         if ($sectionId) {
                 // Allow assignments with matching section_id OR null section_id (class-wide assignments)
                 $query->where(function($q) use ($sectionId) {
@@ -401,14 +418,78 @@ class AutoGenerateService
                 });
             }
             
+            // Filter by current academic year if available
+            if ($currentSession) {
+                $query->where(function($q) use ($currentSession) {
+                    $q->where('academic_year_id', $currentSession)
+                      ->orWhereNull('academic_year_id');
+                });
+            }
+            
+            // Filter by current academic term if available
+            if ($currentTerm) {
+                $query->where(function($q) use ($currentTerm) {
+                    $q->where('academic_term', $currentTerm)
+                      ->orWhereNull('academic_term');
+                });
+            }
+            
             $assignments = $query->get();
             
-            Log::debug("Found {$assignments->count()} teacher-subject assignments for class {$classId}" . 
+            if ($assignments->isEmpty()) {
+                Log::warning("No teacher subject assignments found for class {$classId}" . 
+                    ($sectionId ? ", section {$sectionId}" : "") . 
+                    ", session: {$currentSession}, term: {$currentTerm}");
+                
+                // Try a less restrictive query without term filter
+                $backupAssignments = TeacherSubjectAssignment::with(['teacher', 'subject.category'])
+                    ->where('class_id', $classId)
+                    ->where('is_active', true)
+                    ->when($currentSession, function($q) use ($currentSession) {
+                        $q->where(function($subq) use ($currentSession) {
+                            $subq->where('academic_year_id', $currentSession)
+                                ->orWhereNull('academic_year_id');
+                        });
+                    })
+                    ->when($sectionId, function($q) use ($sectionId) {
+                        $q->where(function($subquery) use ($sectionId) {
+                            $subquery->where('section_id', $sectionId)
+                                ->orWhereNull('section_id');
+                        });
+                    })
+                    ->get();
+                    
+                if ($backupAssignments->isNotEmpty()) {
+                    Log::info("Found {$backupAssignments->count()} backup teacher assignments without term filter");
+                    $assignments = $backupAssignments;
+                } else {
+                    // Try without any session/term filtering as last resort
+                    $finalBackupAssignments = TeacherSubjectAssignment::with(['teacher', 'subject.category'])
+                        ->where('class_id', $classId)
+                        ->where('is_active', true)
+                        ->when($sectionId, function($q) use ($sectionId) {
+                            $q->where(function($subquery) use ($sectionId) {
+                                $subquery->where('section_id', $sectionId)
+                                    ->orWhereNull('section_id');
+                            });
+                        })
+                        ->get();
+                        
+                    if ($finalBackupAssignments->isNotEmpty()) {
+                        Log::info("Found {$finalBackupAssignments->count()} final backup teacher assignments without any session/term filters");
+                        $assignments = $finalBackupAssignments;
+                    }
+                }
+            }
+            
+            Log::info("Found {$assignments->count()} relevant teacher-subject assignments for class {$classId}" . 
                       ($sectionId ? ", section {$sectionId}" : ""));
                       
             return $assignments;
         } catch (\Exception $e) {
-            Log::error("Error getting teacher assignments: " . $e->getMessage());
+            Log::error("Error getting teacher assignments: " . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return collect();
         }
     }
@@ -1155,7 +1236,7 @@ class AutoGenerateService
     }
 
     /**
-     * Find a teacher for a subject based on assignments and availability
+     * Find an appropriate teacher for a subject
      *
      * @param int $subjectId
      * @param int $classId
@@ -1173,7 +1254,7 @@ class AutoGenerateService
     ): ?int {
         try {
             // Get the current timetable to extract academic session and term
-            $timetable = SchoolTimetable::find($subjectId);
+            $timetable = SchoolTimetable::findOrFail($classId);
             $currentSession = $timetable ? $timetable->academic_session : null;
             $currentTerm = $timetable ? $timetable->academic_term : null;
             
@@ -1185,6 +1266,10 @@ class AutoGenerateService
                     $currentSession = $currentSessionSetting->description;
                 }
             }
+            
+            \Log::debug("Finding teacher for subject ID {$subjectId} in class ID {$classId}, " . 
+                       ($sectionId ? "section ID {$sectionId}, " : "") . 
+                       "session: {$currentSession}, term: {$currentTerm}");
             
             // Find teachers assigned to this subject for this class/section
             $query = TeacherSubjectAssignment::where('subject_id', $subjectId)
@@ -1225,10 +1310,16 @@ class AutoGenerateService
                     'academic_term' => $currentTerm
                 ]);
                 
-                // Try a less restrictive query without term/session filters as fallback
+                // Try a less restrictive query without term filter first
                 $backupAssignments = TeacherSubjectAssignment::where('subject_id', $subjectId)
                     ->where('class_id', $classId)
                     ->where('is_active', true)
+                    ->when($currentSession, function($q) use ($currentSession) {
+                        $q->where(function($subq) use ($currentSession) {
+                            $subq->where('academic_year_id', $currentSession)
+                                ->orWhereNull('academic_year_id');
+                        });
+                    })
                     ->when($sectionId, function($q) use ($sectionId) {
                         $q->where(function($subquery) use ($sectionId) {
                             $subquery->where('section_id', $sectionId)
@@ -1238,10 +1329,28 @@ class AutoGenerateService
                     ->get();
                     
                 if ($backupAssignments->isNotEmpty()) {
-                    \Log::info("Found {$backupAssignments->count()} backup teacher assignments without term/session filters");
+                    \Log::info("Found {$backupAssignments->count()} backup teacher assignments without term filter");
                     $assignments = $backupAssignments;
                 } else {
+                    // As a last resort, try without any term/session filters
+                    $finalBackupAssignments = TeacherSubjectAssignment::where('subject_id', $subjectId)
+                        ->where('class_id', $classId)
+                        ->where('is_active', true)
+                        ->when($sectionId, function($q) use ($sectionId) {
+                            $q->where(function($subquery) use ($sectionId) {
+                                $subquery->where('section_id', $sectionId)
+                                    ->orWhereNull('section_id');
+                            });
+                        })
+                        ->get();
+                        
+                    if ($finalBackupAssignments->isNotEmpty()) {
+                        \Log::info("Found {$finalBackupAssignments->count()} final backup teacher assignments without any term/session filters");
+                        $assignments = $finalBackupAssignments;
+                    } else {
+                        \Log::warning("No teacher assignments found for subject ID {$subjectId}, trying to find any available teacher");
                     return null;
+                    }
                 }
             }
             
@@ -1367,7 +1476,22 @@ class AutoGenerateService
             $busyTeachers = $this->findBusyTeachers($day, $periodId);
             \Log::debug("Found " . count($busyTeachers) . " busy teachers for day=$day, period=$periodId");
             
-            // Find an appropriate teacher using our new method
+            // First check if we have a specific teacher in the subject preferences
+            $teacherId = null;
+            if (isset($config['subject_preferences'][$subjectId])) {
+                $preferredTeacherId = $config['subject_preferences'][$subjectId]['teacher_id'] ?? null;
+                
+                // Check if the preferred teacher is available (not busy)
+                if ($preferredTeacherId && !in_array($preferredTeacherId, $busyTeachers)) {
+                    $teacherId = $preferredTeacherId;
+                    \Log::debug("Using preferred teacher ID $teacherId for subject ID $subjectId from subject preferences");
+                } else if ($preferredTeacherId) {
+                    \Log::debug("Preferred teacher ID $preferredTeacherId is busy, looking for alternatives");
+                }
+            }
+            
+            // If no preferred teacher is available, find an appropriate teacher using our method
+            if (!$teacherId) {
             $teacherId = $this->findTeacherForSubject(
                 $subjectId,
                 $classId,
@@ -1375,6 +1499,7 @@ class AutoGenerateService
                 $busyTeachers,
                 $config['prioritize_primary_teachers'] ?? true
             );
+            }
             
             if (!$teacherId) {
                 \Log::warning("No teacher found for subject ID $subjectId in timetable ID $timetableId", [
@@ -1395,8 +1520,8 @@ class AutoGenerateService
             }
             
             // Get subject name for logging
-            $subjectName = Subject::find($subjectId)?->name ?? "Subject #$subjectId";
-            $teacherName = $teacherId ? (StaffRecord::find($teacherId)?->name ?? "Teacher #$teacherId") : "Unassigned";
+            $subjectName = Subject::find($subjectId)?->subject_name ?? "Subject #$subjectId";
+            $teacherName = $teacherId ? (User::find($teacherId)?->name ?? "Teacher #$teacherId") : "Unassigned";
             
             // Create the timetable entry
             $entry = new TimetableSchedule();
@@ -1409,24 +1534,22 @@ class AutoGenerateService
             $entry->notes = 'Auto-generated';
             $entry->save();
             
-            \Log::info("Created timetable entry: Day=$day, Period=$periodId, Subject=$subjectName, Teacher=$teacherName", [
-                'timetable_id' => $timetableId,
-                'entry_id' => $entry->id
-            ]);
+            // Log success
+            \Log::info("Created timetable entry: $day, period $periodId, subject '$subjectName' with teacher '$teacherName'");
             
-            $stats['entries_created']++;
+            // Update statistics
+            $stats['created'] = isset($stats['created']) ? $stats['created'] + 1 : 1;
+            
             return $entry;
         } catch (\Exception $e) {
-            \Log::error("Failed to create timetable entry: " . $e->getMessage(), [
+            \Log::error("Error creating timetable entry: " . $e->getMessage(), [
                 'timetable_id' => $timetableId,
-                'day' => $day,
                 'period_id' => $periodId,
                 'subject_id' => $subjectId,
-                'class_id' => $classId,
-                'section_id' => $sectionId,
                 'trace' => $e->getTraceAsString()
             ]);
-            $stats['conflicts']++;
+            
+            $stats['errors'] = isset($stats['errors']) ? $stats['errors'] + 1 : 1;
             return null;
         }
     }

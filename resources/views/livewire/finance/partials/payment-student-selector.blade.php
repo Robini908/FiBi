@@ -1,23 +1,23 @@
-<div class="bg-white rounded-lg shadow-sm mb-6">
-    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-white">
+<div class="bg-white rounded-lg shadow-sm mb-6 overflow-hidden">
+    <div class="px-6 py-5 border-b border-gray-100">
         @if($isParent)
-            <h2 class="text-lg font-medium text-gray-900">Your Children</h2>
+            <h2 class="text-lg font-medium text-gray-900 tracking-tight">Your Children</h2>
             <p class="mt-1 text-sm text-gray-600">
                 Select a child to view and manage their fees
             </p>
         @elseif($isStudent)
-            <h2 class="text-lg font-medium text-gray-900">Your Fee Information</h2>
+            <h2 class="text-lg font-medium text-gray-900 tracking-tight">Your Fee Information</h2>
             <p class="mt-1 text-sm text-gray-600">
                 View your fee details and make payments
             </p>
         @else
-            <h2 class="text-lg font-medium text-gray-900">Select a Student</h2>
+            <h2 class="text-lg font-medium text-gray-900 tracking-tight">Select a Student</h2>
             <p class="mt-1 text-sm text-gray-600">
                 Search for a student by name, class, or admission number to view and manage their fees
             </p>
         @endif
     </div>
-    
+
     <div class="p-6">
         @if(!$isStudent && !$selectedStudentId)
             @if($isParent && count($students) === 0)
@@ -49,21 +49,21 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </div>
-                            <input 
-                                wire:model.live.debounce.300ms="search" 
-                                type="text" 
-                                id="studentSearch" 
-                                class="focus:ring-green-500 focus:border-green-500 block w-full pl-10 py-2 sm:text-sm border-gray-300 rounded-md" 
+                            <input
+                                wire:model.live.debounce.300ms="search"
+                                type="text"
+                                id="studentSearch"
+                                class="focus:ring-green-500 focus:border-green-500 block w-full pl-10 py-2 sm:text-sm border-gray-300 rounded-md"
                                 placeholder="Enter student name or admission number">
                         </div>
                     </div>
-                    
+
                     <!-- Class Filter -->
                     <div class="md:col-span-3">
                         <label for="studentClassFilter" class="block text-sm font-medium text-gray-700">Class</label>
-                        <select 
-                            wire:model.live="classFilter" 
-                            id="studentClassFilter" 
+                        <select
+                            wire:model.live="classFilter"
+                            id="studentClassFilter"
                             class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                         >
                             <option value="">All Classes</option>
@@ -72,11 +72,11 @@
                             @endforeach
                         </select>
                     </div>
-                    
+
                     <!-- Search Button -->
                     <div class="md:col-span-4 flex items-end">
-                        <button 
-                            wire:click="loadStudents" 
+                        <button
+                            wire:click="loadStudents"
                             wire:loading.attr="disabled"
                             class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-700 focus:outline-none focus:border-green-700 focus:ring focus:ring-green-200 disabled:opacity-50 transition"
                         >
@@ -95,7 +95,7 @@
                 </div>
             @endif
         @endif
-        
+
         <!-- Search Results -->
         @if(count($students) > 0)
             <div class="mt-6 overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
@@ -120,8 +120,8 @@
                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ $student['class'] }}</td>
                                 @if($isParent || !$isStudent)
                                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                        <button 
-                                            wire:click="selectStudent({{ $student['id'] }})" 
+                                        <button
+                                            wire:click="selectStudent({{ $student['id'] }})"
                                             class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md {{ $selectedStudentId == $student['id'] ? 'text-green-800 bg-green-100' : 'text-white bg-green-600 hover:bg-green-700' }} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                                         >
                                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -155,4 +155,4 @@
             </div>
         @endif
     </div>
-</div> 
+</div>

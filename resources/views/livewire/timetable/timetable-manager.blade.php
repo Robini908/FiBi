@@ -229,7 +229,7 @@
             </div>
             
             <!-- Action Cards -->
-            <div class="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div class="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
                 <!-- Timetable Records Card -->
                 <div class="bg-white rounded-xl border border-gray-100 hover:border-green-200 shadow-sm hover:shadow transition-all duration-300 overflow-hidden group">
                     <div class="p-6">
@@ -301,6 +301,23 @@
                         >
                             View Timetable
                         </button>
+                    </div>
+                </div>
+                
+                <!-- Timetable Consolidator Card -->
+                <div class="bg-white rounded-xl border border-gray-100 hover:border-green-200 shadow-sm hover:shadow transition-all duration-300 overflow-hidden group">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors duration-300">
+                            <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-medium text-gray-800 mb-2">Timetable Consolidator</h3>
+                        <p class="text-gray-500 text-sm mb-5 h-12">Combine multiple timetables into a unified view</p>
+                        
+                        <a href="{{ route('tt.consolidator') }}" class="w-full block text-center mt-2 px-4 py-2.5 rounded-full text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                            Open Consolidator
+                        </a>
                     </div>
                 </div>
             </div>

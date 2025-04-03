@@ -58,7 +58,7 @@ class StudentRecord extends Model
         'upi_number', // Added
     ];
 
-    protected $appends = ['is_enrolled'];
+    protected $appends = ['is_enrolled', 'name'];
 
     protected $casts = [
         'suspension_date' => 'datetime',
@@ -284,5 +284,16 @@ class StudentRecord extends Model
         }
         
         return StudentTransition::create($attributes);
+    }
+
+    /**
+     * Get the full name of the student.
+     *
+     * @return string
+     */
+    public function getNameAttribute()
+    {
+        $middleName = $this->middle_name ? ' ' . $this->middle_name . ' ' : ' ';
+        return $this->first_name . $middleName . $this->last_name;
     }
 }

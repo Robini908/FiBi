@@ -243,6 +243,15 @@ class TimetableView extends Component
         $this->sectionId = $sectionId;
         $this->activeDay = strtolower(date('l')); // Default to current day
         
+        // Enhanced logging for debugging
+        \Log::debug("Mounted TimetableView with parameters: timetableId={$timetableRecordId}, sectionId={$sectionId}");
+        
+        // Validate the timetable ID early
+        if (empty($this->timetableRecordId)) {
+            \Log::error("TimetableView mounted with empty timetableRecordId");
+            toast()->danger('Error: Invalid timetable ID')->push();
+        }
+        
         // Set the timetable property
         $this->timetable = $this->getTimetableProperty();
         $this->section = $this->getSectionProperty();
@@ -253,7 +262,6 @@ class TimetableView extends Component
         // Check if we have weekend slots and should show weekend days
         $this->checkWeekendSlots();
         
-        \Log::debug("Mounted TimetableView: timetableId={$timetableRecordId}, sectionId={$sectionId}");
         if ($this->timetable) {
             \Log::debug("Timetable loaded successfully: {$this->timetable->id}");
         } else {
@@ -340,7 +348,7 @@ class TimetableView extends Component
         $this->timetable = SchoolTimetable::with('myClass')->find($this->timetableRecordId);
         
         if (!$this->timetable) {
-            Toast::danger('Timetable not found. Please select a valid timetable.')->push();
+            toast()->danger('Timetable not found. Please select a valid timetable.')->push();
             $this->redirect(route('timetable.list'));
             return;
         }
@@ -1103,13 +1111,21 @@ class TimetableView extends Component
             if ($assignments->isEmpty()) {
                 Log::warning('No teacher subject assignments found for this class/section/term', [
                     'class_id' => $classId,
-                    'section_id' => $sectionId
+                    'section_id' => $sectionId,
+                    'academic_session' => $academicSession,
+                    'academic_term' => $academicTerm
                 ]);
                 
-                // Try a less restrictive query without term/session filters
+                // Try a less restrictive query without term filter first
                 $backupAssignments = TeacherSubjectAssignment::with(['teacher', 'subject.category'])
                     ->where('class_id', $classId)
                     ->where('is_active', true)
+                    ->when($academicSession, function($q) use ($academicSession) {
+                        $q->where(function($subq) use ($academicSession) {
+                            $subq->where('academic_year_id', $academicSession)
+                                ->orWhereNull('academic_year_id');
+                        });
+                    })
                     ->when($sectionId, function($q) use ($sectionId) {
                         $q->where(function($subquery) use ($sectionId) {
                             $subquery->where('section_id', $sectionId)
@@ -1119,16 +1135,33 @@ class TimetableView extends Component
                     ->get();
                     
                 if ($backupAssignments->isNotEmpty()) {
-                    Log::info("Found {$backupAssignments->count()} backup teacher assignments without term/session filters");
+                    Log::info("Found {$backupAssignments->count()} backup teacher assignments without term filter");
                     $assignments = $backupAssignments;
+                } else {
+                    // As a last resort, try without any term/session filters
+                    $finalBackupAssignments = TeacherSubjectAssignment::with(['teacher', 'subject.category'])
+                        ->where('class_id', $classId)
+                        ->where('is_active', true)
+                        ->when($sectionId, function($q) use ($sectionId) {
+                            $q->where(function($subquery) use ($sectionId) {
+                                $subquery->where('section_id', $sectionId)
+                                    ->orWhereNull('section_id');
+                            });
+                        })
+                        ->get();
+                        
+                    if ($finalBackupAssignments->isNotEmpty()) {
+                        Log::info("Found {$finalBackupAssignments->count()} final backup teacher assignments without any term/session filters");
+                        $assignments = $finalBackupAssignments;
                 } else {
                     Log::error("No teacher subject assignments found, even without term/session filters");
                     return;
                 }
-            } else {
+                }
+            }
+            
                 Log::info("Found {$assignments->count()} teacher-subject assignments for class $classId" . 
                     ($sectionId ? ", section $sectionId" : ""));
-            }
             
             // Process assignments into subject preferences
             $subjectPreferences = [];
@@ -1152,13 +1185,26 @@ class TimetableView extends Component
                 $categoryId = optional($subject->category)->id;
                 
                 // Skip if we already have a primary teacher for this subject
+                // and the current assignment is not primary
                 if (isset($subjectPreferences[$subjectId]) && 
                     $subjectPreferences[$subjectId]['is_primary'] && 
                     !$assignment->is_primary) {
                     continue;
                 }
                 
-                // Create base preferences
+                // Override existing non-primary assignment with a primary one
+                if (isset($subjectPreferences[$subjectId]) && 
+                    !$subjectPreferences[$subjectId]['is_primary'] && 
+                    $assignment->is_primary) {
+                    // This is a better assignment (primary), so we'll replace the existing one
+                } else if (isset($subjectPreferences[$subjectId])) {
+                    // If both are primary or both are non-primary, prefer the latest one
+                    if ($assignment->updated_at < $subjectPreferences[$subjectId]['updated_at']) {
+                        continue;
+                    }
+                }
+                
+                // Create base preferences with more data from the assignment
                 $preferences = [
                     'name' => $subject->subject_name,
                     'category' => $categoryName,
@@ -1166,6 +1212,8 @@ class TimetableView extends Component
                     'teacher_id' => $teacher->id,
                     'teacher_name' => $teacher->name,
                     'is_primary' => $assignment->is_primary,
+                    'updated_at' => $assignment->updated_at,
+                    'assignment_id' => $assignment->id,
                     'preferred_time' => 'any',
                     'max_consecutive' => 2,
                     'weekly_frequency' => 3,
@@ -1175,14 +1223,17 @@ class TimetableView extends Component
                 // Customize based on subject type
                 $this->customizeSubjectPreferences($preferences, $subject, $categoryName);
                 
-                // Add to preferences array, overriding any existing non-primary assignment
+                // Add to preferences array
                 $subjectPreferences[$subjectId] = $preferences;
+                
+                Log::debug("Added subject preference: {$subject->subject_name} with teacher {$teacher->name} " . 
+                    ($assignment->is_primary ? '(PRIMARY)' : ''));
             }
             
             // Only update if we have data
             if (!empty($subjectPreferences)) {
                 $this->autoGenerateForm['subject_preferences'] = $subjectPreferences;
-                Log::info("Updated auto-generate form with {$assignments->count()} subject preferences");
+                Log::info("Updated auto-generate form with " . count($subjectPreferences) . " subject preferences from teacher assignments");
             } else {
                 Log::warning("No subject preferences could be created from assignments");
             }
@@ -1385,12 +1436,22 @@ class TimetableView extends Component
                 $sectionName
             );
             
+            // Ensure stats is an array
+            if (!is_array($stats)) {
+                $stats = ['entries_created' => 0, 'skipped' => 0, 'conflicts' => 0];
+                \Log::error("Auto-generate service returned a non-array value", [
+                    'type' => gettype($stats),
+                    'value' => $stats
+                ]);
+            }
+            
             // Reload the timetable data
             $this->refreshTimetable();
             $this->closeAutoGenerateModal();
             
             // Show a success message with statistics
-            if ($stats['created'] > 0 || $stats['cleared'] > 0) {
+            if (isset($stats['entries_created']) && $stats['entries_created'] > 0 || 
+                isset($stats['cleared']) && $stats['cleared'] > 0) {
                 $message = "Auto-generated timetable: ";
                 
                 // Information about clearing or respecting existing entries
@@ -1398,12 +1459,12 @@ class TimetableView extends Component
                     $message .= "{$stats['cleared']} existing entries cleared, ";
                 }
                 
-                $message .= "{$stats['created']} new entries created";
+                $message .= (isset($stats['entries_created']) ? $stats['entries_created'] : 0) . " new entries created";
                 
-                if ($stats['conflicts'] > 0) {
+                if (isset($stats['conflicts']) && $stats['conflicts'] > 0) {
                     $message .= ", {$stats['conflicts']} conflicts skipped";
                 }
-                if ($stats['skipped'] > 0) {
+                if (isset($stats['skipped']) && $stats['skipped'] > 0) {
                     $message .= ", {$stats['skipped']} slots skipped";
                 }
                 
@@ -1435,11 +1496,219 @@ class TimetableView extends Component
     }
     
     /**
+     * Get effective timetable ID, falling back to timetable object if needed
+     *
+     * @return int|null
+     */
+    private function getEffectiveTimetableId()
+    {
+        // First try to use the direct property
+        if (!empty($this->timetableRecordId)) {
+            return $this->timetableRecordId;
+        }
+        
+        // If that's empty, try to use the ID from the timetable object
+        if (isset($this->timetable) && $this->timetable) {
+            \Log::info("Using timetable object ID as fallback: {$this->timetable->id}");
+            return $this->timetable->id;
+        }
+        
+        // If both are empty, return null to indicate no valid ID
+        return null;
+    }
+    
+    /**
      * Print the timetable
      */
     public function printTimetable()
     {
-        $this->dispatch('printTimetable');
+        try {
+            // Use the effective ID with fallback mechanism
+            $timetableId = $this->getEffectiveTimetableId();
+            $sectionId = $this->sectionId;
+            
+            if (empty($timetableId)) {
+                \Log::error("Cannot print timetable - no valid timetable ID available");
+                toast()->danger('Error: Cannot print - Timetable ID is missing')->push();
+                return false;
+            }
+            
+            // Check if timetable exists in database
+            $timetable = SchoolTimetable::find($timetableId);
+            if (!$timetable) {
+                \Log::error("Cannot print timetable - timetable with ID {$timetableId} not found");
+                toast()->danger('Error: Timetable not found')->push();
+                return false;
+            }
+            
+            // Generate URL for the print view
+            try {
+                $printUrl = route('tt.print', ['timetableId' => $timetableId, 'sectionId' => $sectionId]);
+                
+                // Log the generated URL for debugging
+                \Log::info("Print URL generated: {$printUrl}");
+                
+                // Dispatch event to open the print window in a new tab
+                // Using both methods for compatibility
+                $this->dispatch('openPrintWindow', ['url' => $printUrl]);
+                $this->dispatchBrowserEvent('openPrintWindow', ['url' => $printUrl]);
+                
+                // As a fallback, we'll also pass the URL to the browser's session storage
+                // This allows a JavaScript fallback to pick it up if events fail
+                session()->flash('print_url', $printUrl);
+                
+                // Return the URL for direct access if needed
+                return $printUrl;
+            } catch (\Exception $e) {
+                // If route generation fails, try direct URL
+                \Log::error("Error generating print URL: " . $e->getMessage());
+                
+                // Fallback to direct URL construction
+                $printUrl = url("timetables/print/{$timetableId}" . ($sectionId ? "/{$sectionId}" : ""));
+                \Log::info("Using fallback print URL: {$printUrl}");
+                
+                // Dispatch with fallback URL
+                $this->dispatch('openPrintWindow', ['url' => $printUrl]);
+                $this->dispatchBrowserEvent('openPrintWindow', ['url' => $printUrl]);
+                session()->flash('print_url', $printUrl);
+                
+                return $printUrl;
+            }
+        } catch (\Exception $e) {
+            \Log::error("Exception in printTimetable: " . $e->getMessage());
+            toast()->danger('Error printing timetable: ' . $e->getMessage())->push();
+            return false;
+        }
+    }
+    
+    /**
+     * Export the timetable as PDF
+     */
+    public function exportPDF()
+    {
+        try {
+            // Use the effective ID with fallback mechanism
+            $timetableId = $this->getEffectiveTimetableId();
+            $sectionId = $this->sectionId;
+            
+            if (empty($timetableId)) {
+                \Log::error("Cannot export PDF - no valid timetable ID available");
+                toast()->danger('Error: Cannot export - Timetable ID is missing')->push();
+                return false;
+            }
+            
+            // Check if timetable exists in database
+            $timetable = SchoolTimetable::find($timetableId);
+            if (!$timetable) {
+                \Log::error("Cannot export PDF - timetable with ID {$timetableId} not found");
+                toast()->danger('Error: Timetable not found')->push();
+                return false;
+            }
+            
+            // Generate URL for the PDF export
+            try {
+                $pdfUrl = route('tt.export.pdf', ['timetableId' => $timetableId, 'sectionId' => $sectionId]);
+                
+                // Log the generated URL for debugging
+                \Log::info("PDF URL generated: {$pdfUrl}");
+                
+                // Dispatch event to trigger the download
+                // Using both methods for compatibility
+                $this->dispatch('triggerDownload', ['url' => $pdfUrl]);
+                $this->dispatchBrowserEvent('triggerDownload', ['url' => $pdfUrl]);
+                
+                // As a fallback, we'll also pass the URL to the browser's session storage
+                // This allows a JavaScript fallback to pick it up if events fail
+                session()->flash('download_url', $pdfUrl);
+                
+                // Perform a direct redirect as a last resort
+                // This will work even if JavaScript events fail
+                return redirect()->to($pdfUrl);
+            } catch (\Exception $e) {
+                // If route generation fails, try direct URL
+                \Log::error("Error generating PDF URL: " . $e->getMessage());
+                
+                // Fallback to direct URL construction
+                $pdfUrl = url("timetables/export/pdf/{$timetableId}" . ($sectionId ? "/{$sectionId}" : ""));
+                \Log::info("Using fallback PDF URL: {$pdfUrl}");
+                
+                // Dispatch with fallback URL
+                $this->dispatch('triggerDownload', ['url' => $pdfUrl]);
+                $this->dispatchBrowserEvent('triggerDownload', ['url' => $pdfUrl]);
+                session()->flash('download_url', $pdfUrl);
+                
+                return redirect()->to($pdfUrl);
+            }
+        } catch (\Exception $e) {
+            \Log::error("Exception in exportPDF: " . $e->getMessage());
+            toast()->danger('Error exporting PDF: ' . $e->getMessage())->push();
+            return false;
+        }
+    }
+    
+    /**
+     * Export the timetable as Excel
+     */
+    public function exportExcel()
+    {
+        try {
+            // Use the effective ID with fallback mechanism
+            $timetableId = $this->getEffectiveTimetableId();
+            $sectionId = $this->sectionId;
+            
+            if (empty($timetableId)) {
+                \Log::error("Cannot export Excel - no valid timetable ID available");
+                toast()->danger('Error: Cannot export - Timetable ID is missing')->push();
+                return false;
+            }
+            
+            // Check if timetable exists in database
+            $timetable = SchoolTimetable::find($timetableId);
+            if (!$timetable) {
+                \Log::error("Cannot export Excel - timetable with ID {$timetableId} not found");
+                toast()->danger('Error: Timetable not found')->push();
+                return false;
+            }
+            
+            // Generate URL for the Excel export
+            try {
+                $excelUrl = route('tt.export.excel', ['timetableId' => $timetableId, 'sectionId' => $sectionId]);
+                
+                // Log the generated URL for debugging
+                \Log::info("Excel URL generated: {$excelUrl}");
+                
+                // Dispatch event to trigger the download
+                // Using both methods for compatibility
+                $this->dispatch('triggerDownload', ['url' => $excelUrl]);
+                $this->dispatchBrowserEvent('triggerDownload', ['url' => $excelUrl]);
+                
+                // As a fallback, we'll also pass the URL to the browser's session storage
+                // This allows a JavaScript fallback to pick it up if events fail
+                session()->flash('download_url', $excelUrl);
+                
+                // Perform a direct redirect as a last resort
+                // This will work even if JavaScript events fail
+                return redirect()->to($excelUrl);
+            } catch (\Exception $e) {
+                // If route generation fails, try direct URL
+                \Log::error("Error generating Excel URL: " . $e->getMessage());
+                
+                // Fallback to direct URL construction
+                $excelUrl = url("timetables/export/excel/{$timetableId}" . ($sectionId ? "/{$sectionId}" : ""));
+                \Log::info("Using fallback Excel URL: {$excelUrl}");
+                
+                // Dispatch with fallback URL
+                $this->dispatch('triggerDownload', ['url' => $excelUrl]);
+                $this->dispatchBrowserEvent('triggerDownload', ['url' => $excelUrl]);
+                session()->flash('download_url', $excelUrl);
+                
+                return redirect()->to($excelUrl);
+            }
+        } catch (\Exception $e) {
+            \Log::error("Exception in exportExcel: " . $e->getMessage());
+            toast()->danger('Error exporting Excel: ' . $e->getMessage())->push();
+            return false;
+        }
     }
 
     /**
@@ -1529,7 +1798,8 @@ class TimetableView extends Component
     }
 
     /**
-     * Get subjects for a given class and section
+     * Get subjects for the current class and section
+     * Prioritizing subjects that have teacher assignments
      * 
      * @param int $classId
      * @param int|null $sectionId
@@ -1537,22 +1807,87 @@ class TimetableView extends Component
      */
     private function getSubjectsForClass($classId, $sectionId = null)
     {
+        // Get the current timetable record to extract academic year and term
+        $timetableRecord = SchoolTimetable::find($this->timetableRecordId);
+        $academicSession = $timetableRecord ? $timetableRecord->academic_session : null;
+        $academicTerm = $timetableRecord ? $timetableRecord->academic_term : null;
+        
+        \Log::debug("Getting subjects for class ID $classId" . 
+            ($sectionId ? ", section ID $sectionId" : "") . 
+            ", academic session: $academicSession, term: $academicTerm");
+        
         // Get the subjects associated with teacher-subject assignments for this class/section
-        $subjectIds = TeacherSubjectAssignment::where('class_id', $classId)
-            ->when($sectionId, function($query) use ($sectionId) {
-                return $query->where(function($q) use ($sectionId) {
+        $query = TeacherSubjectAssignment::where('class_id', $classId)
+            ->where('is_active', true);
+            
+        // Apply section filter if provided (allowing both specific section and class-wide assignments)
+        if ($sectionId) {
+            $query->where(function($q) use ($sectionId) {
                     $q->where('section_id', $sectionId)
                       ->orWhereNull('section_id');
                 });
-            })
-            ->where('is_active', true)
-            ->pluck('subject_id')
-            ->unique()
-            ->toArray();
+        }
+            
+        // Filter by academic year if available
+        if ($academicSession) {
+            $query->where(function($q) use ($academicSession) {
+                $q->where('academic_year_id', $academicSession)
+                  ->orWhereNull('academic_year_id');
+            });
+        }
+            
+        // Filter by academic term if available
+        if ($academicTerm) {
+            $query->where(function($q) use ($academicTerm) {
+                $q->where('academic_term', $academicTerm)
+                  ->orWhereNull('academic_term');
+            });
+        }
+            
+        $subjectIds = $query->pluck('subject_id')->unique()->toArray();
             
         \Log::debug("Found " . count($subjectIds) . " subject IDs from teacher assignments");
         
-        // If no subjects found from assignments, return all subjects as a fallback
+        // If no subjects found from assignments, try less restricted query (by session only)
+        if (empty($subjectIds) && $academicSession) {
+            $backupQuery = TeacherSubjectAssignment::where('class_id', $classId)
+                ->where('is_active', true);
+                
+            if ($sectionId) {
+                $backupQuery->where(function($q) use ($sectionId) {
+                    $q->where('section_id', $sectionId)
+                      ->orWhereNull('section_id');
+                });
+            }
+                
+            $backupQuery->where(function($q) use ($academicSession) {
+                $q->where('academic_year_id', $academicSession)
+                  ->orWhereNull('academic_year_id');
+            });
+                
+            $subjectIds = $backupQuery->pluck('subject_id')->unique()->toArray();
+            
+            \Log::debug("Found " . count($subjectIds) . " subject IDs from backup teacher assignments (by session only)");
+        }
+        
+        // If still no subjects found, try with no filters
+        if (empty($subjectIds)) {
+            $finalBackupQuery = TeacherSubjectAssignment::where('class_id', $classId)
+                ->where('is_active', true);
+                
+            if ($sectionId) {
+                $finalBackupQuery->where(function($q) use ($sectionId) {
+                    $q->where('section_id', $sectionId)
+                      ->orWhereNull('section_id');
+                });
+            }
+                
+            $subjectIds = $finalBackupQuery->pluck('subject_id')->unique()->toArray();
+            
+            \Log::debug("Found " . count($subjectIds) . " subject IDs from final backup teacher assignments (no filters)");
+        }
+            
+        // If still no subjects found from assignments, return all subjects as a fallback
         if (empty($subjectIds)) {
             \Log::warning("No subjects found from teacher assignments, returning all subjects as fallback");
             return Subject::with('category')
@@ -1562,10 +1897,15 @@ class TimetableView extends Component
         }
             
         // Now get the full subject details with their categories
-        return Subject::with('category')
+        $subjects = Subject::with('category')
             ->whereIn('id', $subjectIds)
             ->orderBy('subject_name')
             ->get();
+            
+        \Log::info("Retrieved {$subjects->count()} subjects for class ID $classId" . 
+            ($sectionId ? ", section ID $sectionId" : ""));
+            
+        return $subjects;
     }
 
     /**

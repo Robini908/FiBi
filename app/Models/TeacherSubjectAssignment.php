@@ -72,10 +72,17 @@ class TeacherSubjectAssignment extends Model
 
     /**
      * Get the academic year associated with the assignment.
+     * Note: In the current schema, academic_year_id is a string like "2023-2024"
+     * and not an ID reference to a model.
      */
-    public function academicYear(): BelongsTo
+    public function academicYear()
     {
-        return $this->belongsTo('App\Models\AcademicYear', 'academic_year_id');
+        // This relationship is for compatibility, but academic_year_id is actually a string
+        // return $this->belongsTo('App\Models\AcademicYear', 'academic_year_id');
+        
+        // Since academic_year_id is a string, there's no real relationship
+        // This is a workaround for compatibility
+        return null;
     }
 
     /**

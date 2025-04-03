@@ -57,14 +57,10 @@ Route::get('/student-info/{id}', function ($id) {
 
 // Exam management routes
 Route::group(['middleware' => ['auth', 'administrator_teacher']], function () {
-    Route::get('/pages/support_team/exams/set', function () {
-        return view('pages.support_team.exams.set');
-    })->name('exams.set');
-    
     Route::get('/pages/support_team/exams/grades', function () {
         return view('pages.support_team.exams.grades');
     })->name('exams.grades');
-    
+
     Route::get('/pages/support_team/exams/assign-exam-marks', function () {
         return view('pages.support_team.exams.assign-exam-marks');
     })->name('exams.assignExamMarks');
@@ -75,11 +71,11 @@ Route::group(['middleware' => ['auth', 'administrator']], function () {
     Route::get('/pages/support_team/students/promotions_demotions', function () {
         return view('pages.support_team.students.promotions_demotions');
     })->name('students.promotions_demotions');
-    
+
     Route::get('/pages/support_team/students/graduation', function () {
         return view('pages.support_team.students.graduation');
     })->name('students.graduation');
-    
+
     Route::get('/pages/support_team/students/manage-students', function () {
         return view('pages.support_team.students.manage-students');
     })->name('students.manage-students');
@@ -90,23 +86,23 @@ Route::group(['middleware' => ['auth', 'parent']], function () {
     Route::get('/pages/parent/child-class', function () {
         return view('pages.parent.child-class');
     })->name('parent.child-class');
-    
+
     Route::get('/pages/parent/child-dorm', function () {
         return view('pages.parent.child-dorm');
     })->name('parent.child-dorm');
-    
+
     Route::get('/pages/parent/child-transition-status', function () {
         return view('pages.parent.child-transition-status');
     })->name('parent.child-transition-status');
-    
+
     Route::get('/pages/parent/child-graduation', function () {
         return view('pages.parent.child-graduation');
     })->name('parent.child-graduation');
-    
+
     Route::get('/pages/parent/child-exams', function () {
         return view('pages.parent.child-exams');
     })->name('parent.child-exams');
-    
+
     Route::get('/pages/parent/child-marks', function () {
         return view('pages.parent.child-marks');
     })->name('parent.child-marks');
@@ -150,8 +146,8 @@ Route::group(['middleware' => 'auth'], function () {
 
     Route::group(['prefix' => 'my_account'], function () {
         Route::get('/', 'MyAccountController@edit_profile')->name('my_account');
-        Route::put('/', 'MyAccountController@update_profile')->name('my_account.update');
-        Route::put('/change_password', 'MyAccountController@change_pass')->name('my_account.change_pass');
+        Route::put('/update', 'MyAccountController@update_profile')->name('my_account.update');
+        Route::put('/change_pass', 'MyAccountController@change_pass')->name('my_account.change_pass');
     });
 
     /*************** Support Team *****************/
@@ -194,6 +190,21 @@ Route::group(['middleware' => 'auth'], function () {
             Route::get('/manager', function() {
                 return view('pages.support_team.timetables.manager');
             })->name('tt.manager');
+
+            // Timetable export routes
+            Route::get('/export/pdf/{timetableId}/{sectionId?}', [App\Http\Controllers\TimetableExportController::class, 'exportPdf'])->name('tt.export.pdf');
+            Route::get('/export/excel/{timetableId}/{sectionId?}', [App\Http\Controllers\TimetableExportController::class, 'exportExcel'])->name('tt.export.excel');
+            Route::get('/print/{timetableId}/{sectionId?}', [App\Http\Controllers\TimetableExportController::class, 'printView'])->name('tt.print');
+
+            // Consolidated Timetable routes
+            Route::get('/consolidator', function() {
+                return view('pages.support_team.timetables.consolidator');
+            })->name('tt.consolidator');
+
+            // Consolidated Timetable export routes
+            Route::get('/consolidated/export/pdf', [App\Http\Controllers\ConsolidatedTimetableController::class, 'exportPdf'])->name('tt.consolidated.export.pdf');
+            Route::get('/consolidated/export/excel', [App\Http\Controllers\ConsolidatedTimetableController::class, 'exportExcel'])->name('tt.consolidated.export.excel');
+            Route::get('/consolidated/print', [App\Http\Controllers\ConsolidatedTimetableController::class, 'printView'])->name('tt.consolidated.print');
 
             /*************** TimeTable Records *****************/
             Route::group(['prefix' => 'records'], function () {
@@ -270,17 +281,17 @@ Route::group(['middleware' => 'auth'], function () {
             Route::resource('grades', 'GradeController');
             Route::resource('dorms', 'DormController');
         });
-        
+
         // Routes accessible by administrators and teachers
         Route::group(['middleware' => 'administrator_teacher'], function () {
             Route::resource('exams', 'ExamController');
         });
-        
+
         // Routes accessible by accountants
         Route::group(['middleware' => 'accountant'], function () {
             Route::resource('payments', 'PaymentController', ['except' => ['show']]);
         });
-        
+
         // Routes accessible by all authenticated users
         Route::get('students', 'StudentRecordController@index')->name('students.index');
         Route::get('students/{id}', 'StudentRecordController@show')->name('students.show');
@@ -293,7 +304,7 @@ Route::group(['middleware' => 'auth'], function () {
 Route::group(['namespace' => 'SuperAdmin', 'middleware' => 'super_admin', 'prefix' => 'super_admin'], function () {
     Route::get('/settings', 'SettingController@index')->name('settings');
     Route::put('/settings', 'SettingController@update')->name('settings.update');
-    
+
     // New Livewire School Settings Route
     Route::get('/school-settings', function() {
         return view('pages.super_admin.school-settings', [
@@ -326,37 +337,37 @@ Route::group(['prefix' => 'finance', 'middleware' => 'auth'], function () {
     Route::get('/dashboard', function () {
         return view('pages.finance.dashboard');
     })->name('finance.dashboard')->middleware('administrator_accountant');
-    
+
     // Finance Accounts - Admin, Accountant
     Route::get('/accounts', function () {
         return view('pages.finance.accounts');
     })->name('finance.accounts')->middleware('administrator_accountant');
-    
+
     // Voteheads - Admin, Accountant
     Route::get('/voteheads', function () {
         return view('pages.finance.voteheads');
     })->name('finance.voteheads')->middleware('administrator_accountant');
-    
+
     // Fee Allocations - Admin, Accountant
     Route::get('/fee-allocations', function () {
         return view('pages.finance.fee-allocations');
     })->name('finance.fee-allocations')->middleware('administrator_accountant');
-    
+
     // Fee Structure - Available to all users (permissions handled in component)
     Route::get('/fee-structure', function () {
         return view('pages.finance.fee-structure');
     })->name('finance.fee-structure');
-    
+
     // Payment Vouchers - Admin, Accountant
     Route::get('/payment-vouchers', function () {
         return view('pages.finance.payment-vouchers');
     })->name('finance.payment-vouchers')->middleware('administrator_accountant');
-    
+
     // Student Fee Payments - Available to all users (permissions handled in component)
     Route::get('/student-fee-payments', function () {
         return view('pages.finance.student-fee-payments');
     })->name('finance.student-fee-payments');
-    
+
     // Parent route to view children's fee payments
     Route::get('/student-fee-payments/my-children', function () {
         return view('pages.finance.student-fee-payments', ['view_type' => 'my_children']);
@@ -366,26 +377,81 @@ Route::group(['prefix' => 'finance', 'middleware' => 'auth'], function () {
     Route::get('/student-arrears', function () {
         return view('pages.finance.student-arrears');
     })->name('finance.student-arrears');
-    
+
     // Student route to view their own arrears
     Route::get('/student-arrears/my-arrears', function () {
         return view('pages.finance.student-arrears', ['view_type' => 'my_arrears']);
     })->name('finance.arrears.my-arrears')->middleware(['auth', 'student']);
-    
+
     // Parent route to view children's arrears
     Route::get('/student-arrears/my-children', function () {
         return view('pages.finance.student-arrears', ['view_type' => 'my_children']);
     })->name('finance.arrears.my-children')->middleware(['auth', 'parent']);
-    
+
     // Student route to view their fee structure
     Route::get('/fee-structure/student', function () {
         return view('pages.finance.fee-structure', ['view_type' => 'student']);
     })->name('finance.fee-structure.view-for-student')->middleware(['auth', 'student']);
-    
+
     // Parent route to view children's fee structure
     Route::get('/fee-structure/children', function () {
         return view('pages.finance.fee-structure', ['view_type' => 'children']);
     })->name('finance.fee-structure.view-for-children')->middleware(['auth', 'parent']);
+
+    // Fee Payment - Available to all users (permissions handled in component)
+    Route::get('/fee-payment', function () {
+        return view('pages.finance.fee-payment');
+    })->name('finance.fee-payment');
+});
+
+// Attendance Routes
+Route::group(['prefix' => 'attendance', 'middleware' => 'auth'], function () {
+    // Take Attendance - Admin, Teachers
+    Route::get('/take', function () {
+        return view('pages.attendance.take-attendance');
+    })->name('attendance.take')->middleware('administrator_teacher');
+
+    // Take Attendance for specific class/section - Admin, Teachers
+    Route::get('/take/{class_id}/{section_id}', function ($class_id, $section_id) {
+        return view('pages.attendance.take-attendance', [
+            'class_id' => $class_id,
+            'section_id' => $section_id,
+        ]);
+    })->name('attendance.take.class')->middleware('administrator_teacher');
+
+    // View Attendance - All authenticated users (permissions handled in component)
+    Route::get('/view', function () {
+        return view('pages.attendance.view-attendance');
+    })->name('attendance.view');
+
+    // View Attendance for specific class/section - All authenticated users
+    Route::get('/view/{class_id}/{section_id}', function ($class_id, $section_id) {
+        return view('pages.attendance.view-attendance', [
+            'class_id' => $class_id,
+            'section_id' => $section_id,
+        ]);
+    })->name('attendance.view.class');
+
+    // Student Attendance History - All authenticated users (permissions handled in component)
+    Route::get('/student-history/{student_id?}', function ($student_id = null) {
+        return view('pages.attendance.student-attendance-history', [
+            'student_id' => $student_id,
+        ]);
+    })->name('attendance.student.history');
+    
+    // Student Attendance Export
+    Route::get('/student-export/{student_id}', [App\Http\Controllers\SupportTeam\AttendanceController::class, 'exportStudentAttendance'])
+        ->name('attendance.student.export');
+
+    // Attendance Analytics - Admin only
+    Route::get('/analytics', function () {
+        return view('pages.attendance.attendance-analytics');
+    })->name('attendance.analytics')->middleware('administrator');
+    
+    // Attendance Report
+    Route::get('/report', [App\Http\Controllers\SupportTeam\AttendanceController::class, 'attendanceReport'])
+        ->name('attendance.report')
+        ->middleware('administrator_teacher');
 });
 
 // LGA Route - Returns empty array since we've removed LGA functionality

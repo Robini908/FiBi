@@ -1,39 +1,112 @@
-<div class="bg-white rounded-xl shadow-sm overflow-hidden">
-    <!-- Header section with title and controls -->
-    <div class="px-5 py-4 bg-white border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <!-- Header section with title and controls (Google-style app bar) -->
+    <div class="px-6 py-4 bg-blue-600 text-white flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
         <div class="flex items-center">
-            <div class="bg-green-50 p-2 rounded-full mr-3">
-                <svg class="w-5 h-5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="mr-4">
+                <svg class="w-6 h-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
             </div>
             <div>
-                <h2 class="text-lg font-medium text-gray-800">Teacher-Subject Assignments</h2>
-                <p class="text-sm text-gray-500">Manage teacher assignments for subjects and classes</p>
+                <h2 class="text-xl font-medium text-white">Teacher-Subject Assignments</h2>
+                <div class="mt-1 inline-flex items-center text-xs font-medium">
+                    <span class="bg-blue-200 text-blue-900 px-2 py-0.5 rounded-full">
+                        {{ $academicYear }} - {{ $academicTerm }}
+                    </span>
+                </div>
             </div>
         </div>
         
-        <div>
-            <button wire:click="openModal" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
-                <svg class="-ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="flex space-x-2">
+            <!-- Add Assignment Button (Google's FAB style) -->
+            <button wire:click="openModal" class="inline-flex items-center px-4 py-2 rounded-full shadow text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                <svg class="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
                 Add Assignment
             </button>
+            
+            <!-- Bulk Assign Button -->
+            <button wire:click="openBulkModal" class="inline-flex items-center px-4 py-2 rounded-full shadow text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                <svg class="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+                Bulk Assign
+            </button>
+            
+            <!-- Actions dropdown -->
+            <div x-data="{ open: false }" @click.away="open = false" @keydown.escape.window="open = false" class="relative inline-block text-left">
+                <button @click="open = !open" type="button" class="inline-flex items-center px-4 py-2 rounded-full shadow text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg class="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                    More
+                </button>
+                
+                <div x-show="open" 
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="transform opacity-0 scale-95"
+                    x-transition:enter-end="transform opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="transform opacity-100 scale-100"
+                    x-transition:leave-end="transform opacity-0 scale-95"
+                    class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white focus:outline-none z-10"
+                    style="display: none;"
+                >
+                    <div class="py-1">
+                        <button 
+                            wire:click="exportToExcel" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                            <div class="flex items-center">
+                                <svg class="mr-3 h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Export to Excel
+                            </div>
+                        </button>
+                        
+                        <button 
+                            wire:click="exportToPdf" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                            <div class="flex items-center">
+                                <svg class="mr-3 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                Export to PDF
+                            </div>
+                        </button>
+                        
+                        <button 
+                            wire:click="openBulkDeleteModal" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 {{ count($selectedAssignments) === 0 ? 'opacity-50 cursor-not-allowed' : '' }}"
+                            {{ count($selectedAssignments) === 0 ? 'disabled' : '' }}
+                        >
+                            <div class="flex items-center">
+                                <svg class="mr-3 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Selected ({{ count($selectedAssignments) }})
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
     <!-- Filter Controls Section -->
     @include('livewire.partials.subject-teacher-assignment.filters')
     
-    <!-- Statistics Cards -->
-    <div class="px-4 py-3 bg-white border-b border-gray-100">
+    <!-- Statistics Cards - Google Dashboard Style -->
+    <div class="px-6 py-4 bg-white border-b border-gray-100">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <!-- Total Assignments -->
-            <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-4">
+            <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-blue-500">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <svg class="h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
@@ -45,10 +118,10 @@
             </div>
             
             <!-- Active Assignments -->
-            <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-4">
+            <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-green-500">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <svg class="h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
@@ -60,7 +133,7 @@
             </div>
             
             <!-- Primary Assignments -->
-            <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-4">
+            <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-yellow-500">
                 <div class="flex items-center">
                     <div class="flex-shrink-0 h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
                         <svg class="h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -75,7 +148,7 @@
             </div>
             
             <!-- Teachers with Assignments -->
-            <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-4">
+            <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-purple-500">
                 <div class="flex items-center">
                     <div class="flex-shrink-0 h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
                         <svg class="h-5 w-5 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -91,18 +164,41 @@
         </div>
     </div>
     
-    <!-- Data Table Section -->
-    <div class="px-4 py-3">
+    <!-- Selected Items Bar - Displays when items are selected, Google's selection feedback style -->
+    @if(count($selectedAssignments) > 0)
+    <div class="bg-blue-50 px-6 py-3 flex items-center justify-between border-b border-blue-100">
+        <div class="text-sm text-blue-700 flex items-center">
+            <svg class="h-5 w-5 mr-2 text-blue-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+                <path fill-rule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clip-rule="evenodd" />
+            </svg>
+            <span class="font-medium">{{ count($selectedAssignments) }}</span> items selected
+        </div>
+        <div>
+            <button 
+                wire:click="$set('selectedAssignments', [])" 
+                class="text-blue-600 hover:text-blue-900 text-sm font-medium focus:outline-none"
+            >
+                Clear selection
+            </button>
+        </div>
+    </div>
+    @endif
+    
+    <!-- Data Table Section - Material Design Table -->
+    <div class="px-6 py-4">
         @if ($assignments->count() > 0)
             @include('livewire.partials.subject-teacher-assignment.table')
         @else
             @include('livewire.partials.subject-teacher-assignment.empty-state')
         @endif
         
-        <!-- Pagination -->
+        <!-- Pagination - Google-style pagination -->
         @if ($assignments->hasPages())
-            <div class="mt-4">
-                {{ $assignments->links() }}
+            <div class="mt-4 flex justify-center">
+                <div class="inline-flex rounded-md shadow-sm">
+                    {{ $assignments->links() }}
+                </div>
             </div>
         @endif
     </div>
@@ -112,11 +208,43 @@
         @include('livewire.partials.subject-teacher-assignment.form-modal')
     @endif
     
+    <!-- Bulk Assignment Modal -->
+    @if ($isBulkModalOpen)
+        @include('livewire.partials.subject-teacher-assignment.bulk-modal')
+    @endif
+    
+    <!-- Bulk Delete Modal -->
+    @if ($isBulkDeleteModalOpen)
+        @include('livewire.partials.subject-teacher-assignment.delete-modal')
+    @endif
+    
     <!-- Alpine JS Handlers -->
     <script>
         document.addEventListener('livewire:initialized', function () {
+            // Handle toast notifications
             @this.on('toast', event => {
                 Toast[event.type](event.message);
+            });
+            
+            // Handle component refresh events
+            @this.on('refreshAssignments', () => {
+                // Reset form state
+                @this.dispatch('reset-form-state');
+                
+                // Additional cleanup if needed
+                if (document.getElementById('assignment-form')) {
+                    document.getElementById('assignment-form').reset();
+                }
+            });
+        });
+
+        document.addEventListener('livewire:initialized', () => {
+            // Listen for confirm-bulk-assignment event
+            Livewire.on('confirm-bulk-assignment', (data) => {
+                const confirmed = confirm(data[0].message + " Do you want to continue anyway?");
+                if (confirmed) {
+                    @this.call('confirmBulkAssignment');
+                }
             });
         });
     </script>

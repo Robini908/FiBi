@@ -2,6 +2,17 @@
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
+                <th scope="col" class="px-4 py-3 text-left">
+                    <div class="flex items-center">
+                        <input 
+                            id="select-all" 
+                            wire:model="selectAll" 
+                            wire:click="toggleSelectAll"
+                            type="checkbox" 
+                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        >
+                    </div>
+                </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Teacher
                 </th>
@@ -28,6 +39,15 @@
         <tbody class="bg-white divide-y divide-gray-200">
             @foreach ($assignments as $assignment)
                 <tr class="hover:bg-gray-50 transition-colors duration-150 ease-in-out">
+                    <td class="px-4 py-4 whitespace-nowrap">
+                        <input 
+                            id="assignment-{{ $assignment->id }}" 
+                            wire:model="selectedAssignments" 
+                            value="{{ $assignment->id }}" 
+                            type="checkbox" 
+                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        >
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-10 w-10">
@@ -49,20 +69,25 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">
-                            {{ $assignment->subject->name ?? 'Unknown' }}
+                            {{ $assignment->subject->subject_name ?? 'Unknown' }}
                         </div>
                         <div class="text-sm text-gray-500">
-                            {{ $assignment->subject->code ?? '' }}
+                            {{ $assignment->subject->subject_code ?? '' }}
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">
-                            {{ $assignment->schoolClass->name ?? 'Unknown' }}
+                            {{ $assignment->myClass->name ?? 'Unknown' }}
                         </div>
+                        @if($assignment->section)
+                        <div class="text-sm text-gray-500">
+                            Section: {{ $assignment->section->name }}
+                        </div>
+                        @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm text-gray-900">
-                            {{ $assignment->academicYear->name ?? 'Unknown' }}
+                            {{ $assignment->academic_year_id }} {{ $assignment->academic_term }}
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">

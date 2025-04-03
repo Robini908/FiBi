@@ -17,6 +17,11 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/rangePlugin.js"></script>
     
+    <!-- Toastr for notifications -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    
     <!-- ApexCharts for Livewire Charts -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     
@@ -122,5 +127,36 @@
 
     @notificationScripts
     @stack('scripts')
+    
+    <script>
+        // Initialize toastr
+        toastr.options = {
+            "closeButton": true,
+            "debug": false,
+            "newestOnTop": true,
+            "progressBar": true,
+            "positionClass": "toast-top-right",
+            "preventDuplicates": false,
+            "onclick": null,
+            "showDuration": "300",
+            "hideDuration": "1000",
+            "timeOut": "5000",
+            "extendedTimeOut": "1000",
+            "showEasing": "swing",
+            "hideEasing": "linear",
+            "showMethod": "fadeIn",
+            "hideMethod": "fadeOut"
+        };
+        
+        // Listen for Livewire notify events
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('notify', param => {
+                console.log('Notification received:', param);
+                if (param && param.type && param.message) {
+                    toastr[param.type](param.message);
+                }
+            });
+        });
+    </script>
 </body>
 </html>

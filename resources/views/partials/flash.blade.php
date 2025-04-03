@@ -1,4 +1,4 @@
-@if(session('flash_success'))
+@if(session('flash_success') || session('success'))
     <div 
         x-data="{ show: true }" 
         x-show="show" 
@@ -13,7 +13,7 @@
                 </div>
                 <div class="ml-3">
                     <p class="text-sm font-medium text-green-800">
-                        {{ session('flash_success') }}
+                        {{ session('flash_success') ?? session('success') }}
                     </p>
                 </div>
                 <div class="ml-auto pl-3">
@@ -34,7 +34,7 @@
     </div>
 @endif
 
-@if(session('flash_info'))
+@if(session('flash_info') || session('info'))
     <div 
         x-data="{ show: true }" 
         x-show="show" 
@@ -49,7 +49,7 @@
                 </div>
                 <div class="ml-3">
                     <p class="text-sm font-medium text-blue-800">
-                        {{ session('flash_info') }}
+                        {{ session('flash_info') ?? session('info') }}
                     </p>
                 </div>
                 <div class="ml-auto pl-3">
@@ -70,7 +70,7 @@
     </div>
 @endif
 
-@if(session('flash_warning'))
+@if(session('flash_warning') || session('warning'))
     <div 
         x-data="{ show: true }" 
         x-show="show" 
@@ -85,7 +85,7 @@
                 </div>
                 <div class="ml-3">
                     <p class="text-sm font-medium text-yellow-800">
-                        {{ session('flash_warning') }}
+                        {{ session('flash_warning') ?? session('warning') }}
                     </p>
                 </div>
                 <div class="ml-auto pl-3">
@@ -106,7 +106,7 @@
     </div>
 @endif
 
-@if(session('flash_error'))
+@if(session('flash_error') || session('error'))
     <div 
         x-data="{ show: true }" 
         x-show="show" 
@@ -121,7 +121,7 @@
                 </div>
                 <div class="ml-3">
                     <p class="text-sm font-medium text-red-800">
-                        {{ session('flash_error') }}
+                        {{ session('flash_error') ?? session('error') }}
                     </p>
                 </div>
                 <div class="ml-auto pl-3">

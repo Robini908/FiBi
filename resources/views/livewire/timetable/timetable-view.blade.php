@@ -52,7 +52,72 @@
                 </div>
             </div>
             
-            <div x-data="{ showExportOptions: false }" class="relative">
+            <div x-data="{ 
+                    showExportOptions: false,
+                    showErrorModal: false,
+                    errorMessage: '',
+                    isLoading: false,
+                    exportType: null,
+                    
+                    timetableId: '{{ $timetableRecordId }}',
+                    sectionId: '{{ $sectionId }}',
+                    fallbackId: '{{ isset($timetable) && $timetable ? $timetable->id : "" }}',
+                    
+                    // Check if we have a valid ID
+                    get effectiveId() {
+                        return this.timetableId || this.fallbackId;
+                    },
+                    
+                    // Export function
+                    exportTimetable(type) {
+                        this.showExportOptions = false;
+                        this.exportType = type;
+                        
+                        // Validate timetable ID
+                        if (!this.effectiveId) {
+                            this.errorMessage = 'Cannot export - Timetable ID is missing. Please try refreshing the page or select a timetable first.';
+                            this.showErrorModal = true;
+                            return;
+                        }
+                        
+                        // Set loading state
+                        this.isLoading = true;
+                        
+                        let url = '';
+                        // Construct URL based on export type
+                        if (type === 'print') {
+                            url = '{{ url('timetables/print') }}/' + this.effectiveId + (this.sectionId ? '/' + this.sectionId : '');
+                        } else if (type === 'pdf') {
+                            url = '{{ url('timetables/export/pdf') }}/' + this.effectiveId + (this.sectionId ? '/' + this.sectionId : '');
+                        } else if (type === 'excel') {
+                            url = '{{ url('timetables/export/excel') }}/' + this.effectiveId + (this.sectionId ? '/' + this.sectionId : '');
+                        }
+                        
+                        // Create a fetch request to track loading state
+                        if (url) {
+                            if (type === 'pdf' || type === 'excel') {
+                                // For downloads we need to create a form and submit it
+                                const form = document.createElement('form');
+                                form.method = 'GET';
+                                form.action = url;
+                                form.target = '_blank';
+                                document.body.appendChild(form);
+                                form.submit();
+                                document.body.removeChild(form);
+                                
+                                // Set a timeout to hide the loading indicator
+                                setTimeout(() => {
+                                    this.isLoading = false;
+                                }, 3000);
+                            } else {
+                                // For print view, just open in a new tab
+                                window.open(url, '_blank');
+                                this.isLoading = false;
+                            }
+                        }
+                    }
+                }" 
+                class="relative">
                 <div class="flex items-center space-x-3">
                     <button 
                         wire:click="$refresh"
@@ -77,19 +142,29 @@
                     
                     <button 
                         @click="showExportOptions = !showExportOptions"
-                        class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm transition-all duration-200">
+                        class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm transition-all duration-200"
+                        :class="{ 'opacity-75 cursor-not-allowed': isLoading }"
+                        :disabled="isLoading">
+                        <template x-if="isLoading">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </template>
+                        <template x-if="!isLoading">
                         <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
-                        Print
-                        <svg class="w-3.5 h-3.5 ml-1 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        </template>
+                        <span x-text="isLoading ? 'Exporting ' + (exportType === 'pdf' ? 'PDF' : exportType === 'excel' ? 'Excel' : 'Print') + '...' : 'Export'"></span>
+                        <svg x-show="!isLoading" class="w-3.5 h-3.5 ml-1 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
                     
                     <!-- Dropdown Menu -->
                     <div class="origin-top-right absolute right-0 mt-10 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10" 
-                         x-show="showExportOptions"
+                         x-show="showExportOptions && !isLoading"
                          x-transition:enter="transition ease-out duration-100"
                          x-transition:enter-start="transform opacity-0 scale-95"
                          x-transition:enter-end="transform opacity-100 scale-100"
@@ -99,24 +174,81 @@
                          @click.away="showExportOptions = false"
                          style="display: none;">
                         <div class="py-1" role="menu" aria-orientation="vertical">
-                            <a href="#" class="flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100" role="menuitem">
+                            <button 
+                                type="button"
+                                @click="exportTimetable('print')" 
+                                class="flex w-full items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100" 
+                                role="menuitem">
                                 <svg class="w-4 h-4 mr-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
                                 </svg>
                                 Print Timetable
-                            </a>
-                            <a href="#" class="flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100" role="menuitem">
-                                <svg class="w-4 h-4 mr-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                Export as PNG
-                            </a>
-                            <a href="#" class="flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100" role="menuitem">
+                            </button>
+                            <button 
+                                type="button"
+                                @click="exportTimetable('pdf')" 
+                                class="flex w-full items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100" 
+                                role="menuitem">
                                 <svg class="w-4 h-4 mr-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 Export as PDF
-                            </a>
+                            </button>
+                            <button 
+                                type="button"
+                                @click="exportTimetable('excel')" 
+                                class="flex w-full items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100" 
+                                role="menuitem">
+                                <svg class="w-4 h-4 mr-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Export as Excel
+                            </button>
+                        </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Error Modal -->
+                <div x-show="showErrorModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <!-- Background overlay -->
+                        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                        
+                        <!-- Modal panel -->
+                        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                                <div class="sm:flex sm:items-start">
+                                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                            Export Error
+                                        </h3>
+                                        <div class="mt-2">
+                                            <p class="text-sm text-gray-500" x-text="errorMessage"></p>
+                                        </div>
+                                        
+                                        <div class="mt-3 bg-gray-50 p-3 rounded-md">
+                                <h4 class="text-sm font-medium text-gray-700 mb-2">Try these steps:</h4>
+                                            <ul class="text-xs text-gray-600 space-y-1 pl-4 list-disc">
+                                    <li>Refresh the page and try again</li>
+                                    <li>Return to the timetable list and select another timetable</li>
+                                                <li>Contact support if the issue persists</li>
+                                </ul>
+                            </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                                <button type="button" 
+                                    @click="showErrorModal = false"
+                                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -236,12 +368,23 @@
                     
                     <div class="ml-auto">
                         <button 
-                            wire:click="printTimetable" 
+                            type="button"
+                            @click="exportTimetable('print')"
+                            :class="{ 'opacity-75 cursor-not-allowed': isLoading }"
+                            :disabled="isLoading"
                             class="inline-flex items-center px-2.5 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            <template x-if="isLoading && exportType === 'print'">
+                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </template>
+                            <template x-if="!(isLoading && exportType === 'print')">
                             <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
                             </svg>
-                            Print
+                            </template>
+                            <span x-text="isLoading && exportType === 'print' ? 'Printing...' : 'Print'"></span>
                         </button>
                     </div>
                 </div>
@@ -530,4 +673,180 @@
     <div class="text-xs text-gray-500 ml-2">
         Modal state: {{ $showAutoGenerateModal ? 'Showing' : 'Hidden' }}
     </div>
+    
+    <!-- Debug element for export IDs, visible only in development -->
+    @if(config('app.debug'))
+    <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+        <strong>DEBUG:</strong> 
+        <ul>
+            <li>timetableRecordId property: "{{ $timetableRecordId }}" ({{ empty($timetableRecordId) ? 'EMPTY' : 'NOT EMPTY' }})</li>
+            <li>sectionId property: "{{ $sectionId }}" ({{ empty($sectionId) ? 'EMPTY' : 'NOT EMPTY' }})</li>
+            <li>timetable object: {{ isset($timetable) ? ($timetable ? 'EXISTS - ID: '.$timetable->id.' / Name: '.$timetable->name : 'NULL') : 'NOT SET' }}</li>
+            <li>section object: {{ isset($section) ? ($section ? 'EXISTS - ID: '.$section->id.' / Name: '.$section->name : 'NULL') : 'NOT SET' }}</li>
+        </ul>
+        
+        @php 
+        $fallbackTimetableId = isset($timetable) && $timetable ? $timetable->id : null;
+        @endphp
+        
+        <div class="mt-2">
+            <strong>Proposed Fix:</strong> 
+            @if(empty($timetableRecordId) && !empty($fallbackTimetableId))
+                <span class="text-green-600">Using timetable object ID ({{ $fallbackTimetableId }}) as fallback</span>
+            @elseif(!empty($timetableRecordId))
+                <span class="text-green-600">Using timetableRecordId property ({{ $timetableRecordId }})</span>
+            @else
+                <span class="text-red-600">No valid timetable ID available!</span>
+            @endif
+        </div>
+        
+        <div class="mt-2">
+            <strong>Manual URLs (JavaScript construction):</strong><br>
+            @php
+            $effectiveId = !empty($timetableRecordId) ? $timetableRecordId : $fallbackTimetableId;
+            @endphp
+            @if(!empty($effectiveId))
+                Print: {{ url("timetables/print") }}/{{ $effectiveId }}{{ $sectionId ? '/'.$sectionId : '' }}<br>
+                PDF: {{ url("timetables/export/pdf") }}/{{ $effectiveId }}{{ $sectionId ? '/'.$sectionId : '' }}<br>
+                Excel: {{ url("timetables/export/excel") }}/{{ $effectiveId }}{{ $sectionId ? '/'.$sectionId : '' }}
+            @else
+                <span class="text-red-600">Cannot generate URLs - no valid timetable ID available</span>
+            @endif
+        </div>
+        
+        @if(!empty($effectiveId))
+        <div class="mt-2">
+            <strong>Route URLs (Laravel route() helper):</strong><br>
+            Print: {{ route('tt.print', ['timetableId' => $effectiveId, 'sectionId' => $sectionId]) }}<br>
+            PDF: {{ route('tt.export.pdf', ['timetableId' => $effectiveId, 'sectionId' => $sectionId]) }}<br>
+            Excel: {{ route('tt.export.excel', ['timetableId' => $effectiveId, 'sectionId' => $sectionId]) }}
+        </div>
+        @else
+        <div class="mt-2 text-red-600">
+            <strong>WARNING:</strong> Cannot generate route URLs because no valid timetable ID is available!
+        </div>
+        @endif
+        
+        <div class="mt-2 pt-2 border-t border-yellow-200">
+            <strong>Actions:</strong>
+            <ul class="list-disc pl-5 mt-1">
+                <li>Try refreshing the page</li>
+                <li>Check if the timetable exists in the database</li>
+                <li>Verify the route parameter is being passed correctly</li>
+            </ul>
+        </div>
+    </div>
+    @endif
+    
+    <script>
+        // Debug info for timetable export
+        console.log('TimetableView initialized with timetableId:', '{{ $timetableRecordId }}', 'sectionId:', '{{ $sectionId }}');
+        
+        // Listen for both Livewire initialization events to ensure compatibility
+        document.addEventListener('livewire:initialized', setupEventListeners);
+        document.addEventListener('livewire:load', setupEventListeners);
+        
+        // Use direct event listeners as a fallback
+        document.addEventListener('DOMContentLoaded', setupEventListeners);
+        
+        function setupEventListeners() {
+            console.log('Setting up event listeners for timetable export');
+            
+            // Function to handle printing
+            window.addEventListener('openPrintWindow', (event) => {
+                try {
+                    const url = event.detail.url || event.detail[0].url;
+                    console.log('openPrintWindow event received, URL:', url);
+                    
+                    // Open the print view in a new tab
+                    const printWindow = window.open(url, '_blank');
+                    
+                    // Focus the new window and print when content is loaded
+                    if (printWindow) {
+                        printWindow.focus();
+                    } else {
+                        console.error('Failed to open print window - popup blocker?');
+                        // Show a user-friendly message if popup is blocked
+                        alert('Print window was blocked. Please allow popups for this site to use the print feature.');
+                    }
+                } catch (err) {
+                    console.error('Error handling print event:', err);
+                }
+            });
+            
+            // Function to handle downloads
+            window.addEventListener('triggerDownload', (event) => {
+                try {
+                    const url = event.detail.url || event.detail[0].url;
+                    console.log('triggerDownload event received, URL:', url);
+                    
+                    // Create a temporary link and trigger the download
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.target = '_blank';
+                    link.click();
+                } catch (err) {
+                    console.error('Error handling download event:', err);
+                }
+            });
+            
+            // Check for flash session values - used as a fallback
+            checkForFlashUrls();
+        }
+        
+        // Legacy event handler compatibility
+        if (typeof window.Livewire !== 'undefined') {
+            console.log('Livewire detected, setting up legacy event handlers');
+            
+            window.Livewire.on('openPrintWindow', (data) => {
+                try {
+                    const url = data.url || data[0].url;
+                    console.log('Legacy openPrintWindow event received, URL:', url);
+                    const printWindow = window.open(url, '_blank');
+                    if (printWindow) printWindow.focus();
+                } catch (err) {
+                    console.error('Error handling legacy print event:', err);
+                }
+            });
+            
+            window.Livewire.on('triggerDownload', (data) => {
+                try {
+                    const url = data.url || data[0].url;
+                    console.log('Legacy triggerDownload event received, URL:', url);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.target = '_blank';
+                    link.click();
+                } catch (err) {
+                    console.error('Error handling legacy download event:', err);
+                }
+            });
+        }
+        
+        // Check if we have flash session URLs to handle
+        function checkForFlashUrls() {
+            try {
+                // This function checks session storage for URLs set by PHP
+                const printUrl = @json(session('print_url'));
+                const downloadUrl = @json(session('download_url'));
+                
+                console.log('Checking for flash URLs - print:', printUrl, 'download:', downloadUrl);
+                
+                if (typeof printUrl === 'string' && printUrl) {
+                    console.log('Found print URL in session:', printUrl);
+                    window.open(printUrl, '_blank');
+                }
+                
+                if (typeof downloadUrl === 'string' && downloadUrl) {
+                    console.log('Found download URL in session:', downloadUrl);
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.target = '_blank';
+                    link.click();
+                }
+            } catch (err) {
+                console.error('Error checking flash URLs:', err);
+            }
+        }
+    </script>
 </div> 
