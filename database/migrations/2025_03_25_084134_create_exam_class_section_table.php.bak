@@ -1,0 +1,54 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('exam_class_section', function (Blueprint $table) {
+            // Add subject_id if it doesn't exist
+            if (!Schema::hasColumn('exam_class_section', 'subject_id')) {
+                $table->foreignId('subject_id')->nullable()->after('section_id')
+                    ->constrained('subjects')->nullOnDelete();
+            }
+
+            // Add venue if it doesn't exist
+            if (!Schema::hasColumn('exam_class_section', 'venue')) {
+                $table->string('venue')->nullable()->after('end_time');
+            }
+
+            // Add invigilators if it doesn't exist
+            if (!Schema::hasColumn('exam_class_section', 'invigilators')) {
+                $table->json('invigilators')->nullable()->after('venue');
+            }
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('exam_class_section', function (Blueprint $table) {
+            // Drop columns only if they exist
+            if (Schema::hasColumn('exam_class_section', 'subject_id')) {
+                $table->dropForeign(['subject_id']);
+                $table->dropColumn('subject_id');
+            }
+
+            if (Schema::hasColumn('exam_class_section', 'venue')) {
+                $table->dropColumn('venue');
+            }
+
+            if (Schema::hasColumn('exam_class_section', 'invigilators')) {
+                $table->dropColumn('invigilators');
+            }
+        });
+    }
+}; 

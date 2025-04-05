@@ -8,7 +8,7 @@ use App\Models\ParentDetail;
 use App\Models\StudentRecord;
 use App\Models\MyClass;
 use App\Models\Section;
-use App\Models\User;
+use App\User;
 use App\Models\Subject;
 
 class ParentChildClass extends Component

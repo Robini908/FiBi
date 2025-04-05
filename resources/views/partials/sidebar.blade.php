@@ -45,7 +45,7 @@
         <nav class="px-3 space-y-1.5">
             <!-- Dashboard -->
             <a href="{{ route('dashboard') }}"
-               class="{{ Request::is('dashboard*') ? 'bg-green-50 text-green-700 border-l-4 border-green-500' : 'text-gray-600 hover:bg-gray-50 hover:text-green-700' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
+               class="{{ Request::is('dashboard*') ? 'bg-green-50 text-green-700 border-l-4 border-green-500' : 'text-gray-600 hover:bg-gray-50 hover:text-green-700' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150 {{ !Qs::isLibrarian() || Qs::isAdministrator() ? '' : 'hidden' }}">
                 <svg class="{{ Request::is('dashboard*') ? 'text-green-500' : 'text-gray-400 group-hover:text-green-500' }} mr-3 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
@@ -58,14 +58,25 @@
                         Teacher Dashboard
                     @elseif (Qs::isParent())
                         Parent Dashboard
+                    @elseif (Qs::isLibrarian())
+                        Librarian Dashboard
                     @else
                         Dashboard
                     @endif
                 </span>
             </a>
 
+            <!-- Wire Elements Modal Demo (Developer Tools) -->
+            <a href="{{ route('modal.demo') }}"
+               class="{{ Request::is('modal-demo*') ? 'bg-green-50 text-green-700 border-l-4 border-green-500' : 'text-gray-600 hover:bg-gray-50 hover:text-green-700' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
+                <svg class="{{ Request::is('modal-demo*') ? 'text-green-500' : 'text-gray-400 group-hover:text-green-500' }} mr-3 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="truncate">Modal Demo</span>
+            </a>
+
             <!-- Registration Section -->
-            @if (Qs::isAdministratorOrTeacher() || Qs::isParent() || Qs::isStudent())
+            @if ((Qs::isAdministratorOrTeacher() || Qs::isParent() || Qs::isStudent()) && !Qs::isLibrarian())
             <div class="py-1">
                 <button @click="activeMenu = activeMenu === 'registration' ? null : 'registration'"
                         class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
@@ -151,7 +162,7 @@
             @endif
 
             <!-- Staff Management Section -->
-            @if (Qs::userIsAdmin())
+            @if (Qs::userIsAdmin() && !Qs::isLibrarian())
             <div class="py-1">
                 <button @click="activeMenu = activeMenu === 'staff' ? null : 'staff'"
                         class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
@@ -178,7 +189,7 @@
             @endif
 
             <!-- Academics Section -->
-            @if (Qs::isAcademicStaff() || Qs::isAdministrator() || Qs::isParent())
+            @if ((Qs::isAcademicStaff() || Qs::isAdministrator() || Qs::isParent()) && !Qs::isLibrarian())
             <div class="py-1">
                 <button @click="activeMenu = activeMenu === 'academics' ? null : 'academics'"
                         class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
@@ -228,9 +239,14 @@
                         <span class="truncate">Timetable Manager</span>
                     </a>
 
-                    <a href="{{ Qs::isParent() ? route('parent.child-exams') : (Qs::isStudent() ? route('student.my-exams') : route('exams.set')) }}"
-                       class="{{ in_array(Route::currentRouteName(), ['exams.set', 'parent.child-exams', 'student.my-exams']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
-                        <span class="truncate">Exam Management</span>
+                    <a href="{{ Qs::isAdministratorOrTeacher() ? route('exams.modern-management') : (Qs::isParent() ? route('parent.child-exams') : route('student.my-exams')) }}"
+                       class="{{ in_array(Route::currentRouteName(), ['exams.modern-management', 'parent.child-exams', 'student.my-exams']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
+                        <span class="truncate">
+                            <svg class="inline-block w-4 h-4 mr-1 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            Modern Exam System
+                        </span>
                     </a>
 
                     <a href="{{ Qs::isParent() ? route('parent.child-marks') : (Qs::isStudent() ? route('student.my-marks') : route('exams.assignExamMarks')) }}"
@@ -242,7 +258,7 @@
             @endif
 
             <!-- Attendance Section -->
-            @if (Qs::isAcademicStaff() || Qs::isAdministrator() || Qs::isParent())
+            @if ((Qs::isAcademicStaff() || Qs::isAdministrator() || Qs::isParent()) && !Qs::isLibrarian())
             <div class="py-1">
                 <button @click="activeMenu = activeMenu === 'attendance' ? null : 'attendance'"
                         class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
@@ -313,8 +329,117 @@
             </div>
             @endif
 
+            <!-- Library Section for Staff -->
+            @if(auth()->user()->hasAnyRole(['librarian', 'teacher', 'admin', 'superadmin']))
+            <div x-data="{ open: {{ request()->routeIs('library.*') && !request()->routeIs('library.catalog') && !request()->routeIs('library.my-books') && !request()->routeIs('library.my-children-books') ? 'true' : 'false' }} }">
+                <button @click="open = !open"
+                    class="w-full flex items-center py-3 px-4 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:bg-gray-50"
+                    :class="{ 'bg-gray-50 text-gray-900': open }">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <span class="flex-1 truncate">Library Management</span>
+                    <svg class="ml-auto h-5 w-5 transform transition-transform duration-200" :class="{ 'rotate-90': open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div x-show="open" class="ml-4 pl-4 border-l border-gray-200 space-y-1">
+                    <a href="{{ route('library.books') }}"
+                       class="{{ request()->routeIs('library.books') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Books</span>
+                    </a>
+
+                    @if(auth()->user()->hasAnyRole(['librarian', 'admin', 'superadmin']))
+                    <a href="{{ route('library.authors') }}"
+                       class="{{ request()->routeIs('library.authors') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Authors</span>
+                    </a>
+
+                    <a href="{{ route('library.categories') }}"
+                       class="{{ request()->routeIs('library.categories') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Categories</span>
+                    </a>
+
+                    <a href="{{ route('library.inventory') }}"
+                       class="{{ request()->routeIs('library.inventory') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Inventory</span>
+                    </a>
+
+                    <a href="{{ route('library.loans') }}"
+                       class="{{ request()->routeIs('library.loans') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Loans</span>
+                    </a>
+
+                    <a href="{{ route('library.book-requests') }}"
+                       class="{{ request()->routeIs('library.book-requests') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Book Requests</span>
+                    </a>
+
+                    <a href="{{ route('library.reports') }}"
+                       class="{{ request()->routeIs('library.reports') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Reports</span>
+                    </a>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            <!-- Student Library Access -->
+            @if(auth()->user()->hasRole('student'))
+            <div x-data="{ open: {{ request()->routeIs('library.catalog') || request()->routeIs('library.my-books') ? 'true' : 'false' }} }">
+                <button @click="open = !open"
+                    class="w-full flex items-center py-3 px-4 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:bg-gray-50"
+                    :class="{ 'bg-gray-50 text-gray-900': open }">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <span class="flex-1 truncate">Library</span>
+                    <svg class="ml-auto h-5 w-5 transform transition-transform duration-200" :class="{ 'rotate-90': open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div x-show="open" class="ml-4 pl-4 border-l border-gray-200 space-y-1">
+                    <a href="{{ route('library.catalog') }}"
+                       class="{{ request()->routeIs('library.catalog') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Browse Books</span>
+                    </a>
+                    <a href="{{ route('library.my-books') }}"
+                       class="{{ request()->routeIs('library.my-books') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">My Borrowed Books</span>
+                    </a>
+                </div>
+            </div>
+            @endif
+
+            <!-- Parent Library Access -->
+            @if(auth()->user()->hasRole('parent'))
+            <div x-data="{ open: {{ request()->routeIs('library.catalog') || request()->routeIs('library.my-children-books') ? 'true' : 'false' }} }">
+                <button @click="open = !open"
+                    class="w-full flex items-center py-3 px-4 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:bg-gray-50"
+                    :class="{ 'bg-gray-50 text-gray-900': open }">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <span class="flex-1 truncate">Children's Library</span>
+                    <svg class="ml-auto h-5 w-5 transform transition-transform duration-200" :class="{ 'rotate-90': open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div x-show="open" class="ml-4 pl-4 border-l border-gray-200 space-y-1">
+                    <a href="{{ route('library.catalog') }}"
+                       class="{{ request()->routeIs('library.catalog') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Browse Books</span>
+                    </a>
+                    <a href="{{ route('library.my-children-books') }}"
+                       class="{{ request()->routeIs('library.my-children-books') ? 'bg-gray-50 text-green-700 font-medium' : 'text-gray-600 hover:text-gray-900' }} group flex items-center py-2 px-3 text-sm rounded-md">
+                        <span class="truncate">Children's Books</span>
+                    </a>
+                </div>
+            </div>
+            @endif
+
             <!-- Finance Section -->
-            @if (Qs::isAdministrator() || Qs::isAdmin() || Qs::isAccountant() || Qs::isParent())
+            @if ((Qs::isAdministrator() || Qs::isAdmin() || Qs::isAccountant() || Qs::isParent()) && !Qs::isLibrarian())
             <div class="py-1">
                 <button @click="activeMenu = activeMenu === 'finance' ? null : 'finance'"
                         class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
@@ -431,7 +556,7 @@
             @endif
 
             <!-- Settings -->
-            @if (Qs::isAdministrativeStaff())
+            @if (Qs::isAdministrativeStaff() && !Qs::isLibrarian())
             <div class="py-1 mt-2">
                 <button @click="activeMenu = activeMenu === 'settings' ? null : 'settings'"
                         class="text-gray-600 hover:bg-gray-50 hover:text-green-700 group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">

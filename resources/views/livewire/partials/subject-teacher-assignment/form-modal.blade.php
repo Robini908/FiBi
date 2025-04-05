@@ -81,8 +81,10 @@
                                                 <option value="{{ $academicYear['id'] }}" {{ isset($academicYear['is_current']) && $academicYear['is_current'] ? 'class=font-bold' : '' }}>
                                                     {{ $academicYear['name'] }} {{ isset($academicYear['is_current']) && $academicYear['is_current'] ? '(Current)' : '' }}
                                                 </option>
-                                            @else
+                                            @elseif(is_object($academicYear))
                                                 <option value="{{ $academicYear->id }}">{{ $academicYear->year }}</option>
+                                            @else
+                                                <option value="{{ $academicYear }}">{{ $academicYear }}</option>
                                             @endif
                                         @endforeach
                                     </select>
@@ -165,5 +167,9 @@
                 </button>
             </div>
         </div>
+    </div>
+</div> 
+    </div>
+</div> 
     </div>
 </div> 

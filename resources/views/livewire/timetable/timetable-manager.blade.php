@@ -320,6 +320,23 @@
                         </a>
                     </div>
                 </div>
+                
+                <!-- Exam Timetable Card -->
+                <div class="bg-white rounded-xl border border-gray-100 hover:border-green-200 shadow-sm hover:shadow transition-all duration-300 overflow-hidden group">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors duration-300">
+                            <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-medium text-gray-800 mb-2">Exam Timetable</h3>
+                        <p class="text-gray-500 text-sm mb-5 h-12">Create and manage exam schedules for selected class and exam</p>
+                        
+                        <a href="{{ route('exam.timetable') }}" class="w-full block text-center mt-2 px-4 py-2.5 rounded-full text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                            Manage Exam Timetable
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
         

@@ -18,6 +18,7 @@ class Academic
      */
     public function handle(Request $request, Closure $next)
     {
-        return (Auth::check() && Qs::isAcademicStaff()) ? $next($request) : redirect()->route('login');
+        // Exclude librarians from academic middleware
+        return (Auth::check() && Qs::isAcademicStaff() && !Qs::isLibrarian()) ? $next($request) : redirect()->route('login');
     }
 } 

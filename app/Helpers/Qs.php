@@ -264,6 +264,24 @@ class Qs
     }
 
     /**
+     * Check if the user is a librarian
+     * @return bool
+     */
+    public static function isLibrarian()
+    {
+        return self::userHasRole('librarian');
+    }
+
+    /**
+     * For backward compatibility
+     * @deprecated Use isLibrarian() instead
+     */
+    public static function userIsLibrarian()
+    {
+        return self::isLibrarian();
+    }
+
+    /**
      * Check if the user is a parent
      * @return bool
      */

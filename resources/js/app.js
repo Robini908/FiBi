@@ -12,12 +12,10 @@ import ToastComponent from '../../vendor/usernotnull/tall-toasts/resources/js/ta
 
 Alpine.plugin(ToastComponent)
 
-Livewire.start()
+// Make Alpine globally available for the modals and other components
+window.Alpine = Alpine
 
-// Make Swal available globally
-window.Swal = Swal;
-
-// Global state management for the sidebar (using Alpine.js from Livewire)
+// Define custom directive for modals
 document.addEventListener('alpine:init', () => {
     Alpine.store('layout', {
         isSidebarOpen: true,
@@ -28,5 +26,18 @@ document.addEventListener('alpine:init', () => {
         toggleMobileMenu() {
             this.isMobileMenuOpen = !this.isMobileMenuOpen;
         }
+    });
+});
+
+Alpine.start()
+Livewire.start()
+
+// Make Swal available globally
+window.Swal = Swal;
+
+// Set up Livewire hooks for modals
+document.addEventListener('livewire:initialized', () => {
+    Livewire.hook('component.initialized', (component) => {
+        // Handle modal component initialization
     });
 });

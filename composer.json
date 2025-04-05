@@ -54,7 +54,7 @@
     "symfony/security-core": "^7.1",
     "usernotnull/tall-toasts": "^2.1",
     "voku/portable-ascii": "^2.0",
-    "wire-elements/modal": "^2.0"
+    "wire-elements/modal": "*"
   },
   "require-dev": {
     "barryvdh/laravel-ide-helper": "^2.13",

@@ -7,14 +7,13 @@ use App\Models\Section;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use App\User;
-use App\Repositories\SettingRepo;
-use Illuminate\Support\Collection;
+use App\Settings\GeneralSettings;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Session;
 use Livewire\Component;
 use Livewire\WithPagination;
-use App\Models\Assignment;
-// Add imports for export functionality
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\TeacherAssignmentsExport;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -23,19 +22,68 @@ class SubjectTeacherAssignment extends Component
 {
     use WithPagination;
     
+    protected $paginationTheme = 'tailwind';
+    
+    // Basic properties
+    public $teachers = [];
+    public $subjects = [];
+    public $classes = [];
+    public $sections = [];
+    public $academicYears = [];
+    public $academicTerms = ['Term 1', 'Term 2', 'Term 3'];
+    
+    // Class/section selection
+    public $classSections = [];
+    public $classSectionId = null;
+    
     // Properties for filtering
-    public $academicYear;
-    public $academicTerm;
     public $classId;
     public $sectionId;
+    public $academicYear;
+    public $academicTerm;
+    public $filterAcademicYear;
+    public $search = '';
+    public $activeFilter = 'all';
+    public $primaryFilter = 'all';
+    public $selectedIds = [];
+    public $selectedAssignments = [];
+    public $selectAll = false;
+    public $perPage = 10;
     public $subjectId;
     public $teacherId;
     public $showInactive = false;
     
-    // Form properties
+    // Statistics
+    public $totalCount = 0;
+    public $activeCount = 0;
+    public $primaryCount = 0;
+    public $teacherCount = 0;
+    
+    // Modal and form states
     public $isModalOpen = false;
+    public $isBulkModalOpen = false;
+    public $isBulkDeleteModalOpen = false;
+    public $showFilters = false;
     public $isEditMode = false;
-    public $currentAssignmentId;
+    public $currentAssignmentId = null;
+    public $processingSections = false;
+    public $showBulkResults = false;
+    public $bulkAssignmentResults = [
+        'created' => 0,
+        'skipped' => 0,
+        'errors' => 0,
+        'total' => 0,
+    ];
+    public $availableSections = [];
+    public $teacherSubjectMappings = [];
+    public $showBulkDeleteResults = false;
+    public $bulkDeleteResults = [
+        'deleted' => 0,
+        'failed' => 0,
+        'total' => 0,
+    ];
+    
+    // Form properties
     public $form = [
         'teacher_id' => '',
         'subject_id' => '',
@@ -49,11 +97,10 @@ class SubjectTeacherAssignment extends Component
     ];
     
     // Bulk assignment properties
-    public $isBulkModalOpen = false;
     public $bulkForm = [
         'teacher_ids' => [],
         'subject_ids' => [],
-        'class_ids' => [],
+        'selected_class_id' => '',
         'section_ids' => [],
         'academic_year_id' => '',
         'academic_term' => '',
@@ -63,70 +110,13 @@ class SubjectTeacherAssignment extends Component
         'override_existing' => false,
     ];
     
-    // Teacher-Subject Mapping Properties
-    public $teacherSubjectMappings = [];
-    
-    public $availableSections;
-    public $processingSections = false;
-    public $bulkAssignmentResults = [
-        'created' => 0,
-        'skipped' => 0,
-        'errors' => 0,
-        'total' => 0,
-    ];
-    public $showBulkResults = false;
-    
-    // Bulk deletion properties
-    public $selectedAssignments = [];
-    public $selectAll = false;
-    public $isBulkDeleteModalOpen = false;
-    public $bulkDeleteResults = [
-        'deleted' => 0,
-        'failed' => 0,
-        'total' => 0,
-    ];
-    public $showBulkDeleteResults = false;
-    
-    // Collection properties
-    public $teachers;
-    public $subjects;
-    public $classes;
-    public $sections = [];
-    public $academicTerms = ['Term 1', 'Term 2', 'Term 3'];
-    
-    // Settings repository
-    protected $settingRepo;
-    
     // Filter properties
     public $filterTeacher = '';
     public $filterSubject = '';
     public $filterClass = '';
-    public $filterAcademicYear = '';
     public $filterStatus = '';
     public $filterPrimary = '';
-    public $perPage = 10;
-    public $search = '';
     
-    // Statistics properties
-    public $activeCount;
-    public $primaryCount;
-    public $teacherCount;
-    
-    // Hardcoded academic years (until AcademicYear model is available)
-    public $academicYears = [];
-    
-    /**
-     * Get the SettingRepo instance
-     */
-    protected function getSettingRepo()
-    {
-        if (!$this->settingRepo) {
-            $this->settingRepo = new SettingRepo();
-        }
-        return $this->settingRepo;
-    }
-    
-    // Listeners
     protected $listeners = [
         'refreshAssignments' => '$refresh',
         'reset-form-state' => 'handleResetFormState',
@@ -138,23 +128,35 @@ class SubjectTeacherAssignment extends Component
      */
     public function mount()
     {
-        // Initialize collections and properties
-        $this->availableSections = collect();
-        $this->teacherSubjectMappings = [];
+        // Initialize default form values or load from query parameters
+        $this->classId = request()->query('class_id');
+        $this->sectionId = request()->query('section_id');
+        
+        // Set default academic year and term
+        $this->setupAcademicYears();
         
         // Get current academic year from settings
-        $currentSession = $this->getSettingRepo()->getSetting('current_session')->first();
-        $currentYear = $currentSession ? $currentSession->description : '2023-2024';
-        
-        // Initialize with default values for filter
-        $this->academicYear = $currentYear;
-        $this->filterAcademicYear = $currentYear;
-        
-        // Set default academic term
+        $currentYear = date('Y');
+        $this->academicYear = ($currentYear) . '-' . ($currentYear + 1);
         $this->academicTerm = 'Term 1';
         
-        // Load collection data
+        // Initialize form with defaults
+        $this->form['academic_year_id'] = $this->academicYear;
+        $this->form['academic_term'] = $this->academicTerm;
+        
+        // Optionally preselect class and section from URL parameters
+        if ($this->classId) {
+            $this->form['class_id'] = $this->classId;
+            $this->loadSections();
+            
+            if ($this->sectionId) {
+                $this->form['section_id'] = $this->sectionId;
+            }
+        }
+        
+        // Load data collections
         $this->loadCollections();
+        $this->loadClassSections();
         
         // Set default per page value
         $this->perPage = 10;
@@ -167,7 +169,7 @@ class SubjectTeacherAssignment extends Component
             'academicYear' => $this->academicYear,
             'academicTerm' => $this->academicTerm,
             'filterAcademicYear' => $this->filterAcademicYear,
-            'currentSession' => $currentSession ? $currentSession->description : 'Not set'
+            'currentSession' => $this->getSetting('current_session')->first() ? $this->getSetting('current_session')->first()->description : 'Not set'
         ]);
     }
     
@@ -214,7 +216,7 @@ class SubjectTeacherAssignment extends Component
         $this->classes = MyClass::orderBy('name')->get();
         
         // Get academic years from settings
-        $sessions = $this->getSettingRepo()->getSetting('session');
+        $sessions = $this->getSetting('session');
         
         // Cast each item explicitly to ensure types are correct
         $this->academicYears = collect($sessions)->map(function($item) {
@@ -322,7 +324,7 @@ class SubjectTeacherAssignment extends Component
         // Keep the current academic year
         if (!$this->form['academic_year_id']) {
             // Get current academic year from settings or use default
-            $currentSession = $this->getSettingRepo()->getSetting('current_session')->first();
+            $currentSession = $this->getSetting('current_session')->first();
             if ($currentSession) {
                 $this->form['academic_year_id'] = $currentSession->description;
             } else {
@@ -538,7 +540,7 @@ class SubjectTeacherAssignment extends Component
      */
     public function resetFilters()
     {
-        $currentSession = $this->getSettingRepo()->getSetting('current_session')->first();
+        $currentSession = $this->getSetting('current_session')->first();
         
         $this->academicYear = $currentSession ? $currentSession->description : null;
         $this->academicTerm = 'Term 1';
@@ -560,7 +562,7 @@ class SubjectTeacherAssignment extends Component
     {
         // Ensure academic year and term are set to default values if not specified
         if (empty($this->academicYear)) {
-            $currentSession = $this->getSettingRepo()->getSetting('current_session')->first();
+            $currentSession = $this->getSetting('current_session')->first();
             $this->academicYear = $currentSession ? $currentSession->description : '2023-2024';
         }
         
@@ -652,7 +654,7 @@ class SubjectTeacherAssignment extends Component
         $this->bulkForm = [
             'teacher_ids' => [],
             'subject_ids' => [],
-            'class_ids' => [],
+            'selected_class_id' => '',
             'section_ids' => [],
             'academic_year_id' => $this->academicYear ?? '',
             'academic_term' => $this->academicTerm ?? 'Term 1',
@@ -661,6 +663,14 @@ class SubjectTeacherAssignment extends Component
             'notes' => '',
             'override_existing' => false,
         ];
+        
+        // Reset class section selection
+        $this->classSectionId = null;
+        
+        // Ensure class sections are loaded
+        if (empty($this->classSections)) {
+            $this->loadClassSections();
+        }
         
         // Initialize teacher-subject mappings with one empty mapping
         $this->teacherSubjectMappings = [
@@ -690,7 +700,8 @@ class SubjectTeacherAssignment extends Component
         \Log::info('Opened bulk assignment modal', [
             'teacherSubjectMappings' => $this->teacherSubjectMappings,
             'academicYear' => $this->academicYear,
-            'academicTerm' => $this->academicTerm
+            'academicTerm' => $this->academicTerm,
+            'classSections' => count($this->classSections)
         ]);
     }
 
@@ -709,17 +720,13 @@ class SubjectTeacherAssignment extends Component
      */
     public function resetBulkForm()
     {
-        // Get current academic year from settings
-        $currentSession = $this->getSettingRepo()->getSetting('current_session')->first();
-        $currentYear = $currentSession ? $currentSession->description : '2023-2024';
-        
         $this->bulkForm = [
             'teacher_ids' => [],
             'subject_ids' => [],
-            'class_ids' => [],
+            'selected_class_id' => '',
             'section_ids' => [],
-            'academic_year_id' => $currentYear,
-            'academic_term' => 'Term 1',
+            'academic_year_id' => $this->academicYear,
+            'academic_term' => $this->academicTerm,
             'is_primary' => true,
             'is_active' => true,
             'notes' => '',
@@ -770,284 +777,110 @@ class SubjectTeacherAssignment extends Component
     }
     
     /**
-     * Save bulk assignments
+     * Handle updating the selected class in bulk form
+     */
+    public function updatedBulkFormSelectedClassId($classId)
+    {
+        // Reset section selection when changing class
+        $this->bulkForm['section_ids'] = [];
+        
+        // Skip if no class selected
+        if (empty($classId)) {
+            $this->availableSections = collect();
+            return;
+        }
+        
+        // Show loading indicator
+        $this->processingSections = true;
+        
+        try {
+            // Load sections for the selected class
+            $this->availableSections = collect();
+            $sections = Section::where('my_class_id', $classId)->get();
+            
+            // Group sections by class ID
+            if ($sections->count() > 0) {
+                $this->availableSections = collect([$classId => $sections]);
+            }
+            
+            // Log the loaded sections
+            \Log::info("Loaded sections for class ID $classId", [
+                'section_count' => $sections->count(),
+            ]);
+        } catch (\Exception $e) {
+            // Log any errors
+            \Log::error("Error loading sections: " . $e->getMessage());
+        } finally {
+            // Hide loading indicator
+            $this->processingSections = false;
+        }
+    }
+
+    /**
+     * Select all sections for the selected class
+     */
+    public function selectAllSections()
+    {
+        if (empty($this->bulkForm['selected_class_id'])) {
+            return;
+        }
+        
+        $classId = $this->bulkForm['selected_class_id'];
+        
+        // Check if we have sections for this class
+        if (!isset($this->availableSections[$classId])) {
+            return;
+        }
+        
+        // Select all section IDs for this class
+        $this->bulkForm['section_ids'] = $this->availableSections[$classId]->pluck('id')->toArray();
+    }
+
+    /**
+     * Clear all selected sections
+     */
+    public function clearSectionSelection()
+    {
+        $this->bulkForm['section_ids'] = [];
+    }
+
+    /**
+     * Validate and save bulk assignments
      */
     public function saveBulkAssignments()
     {
-        // Validate that we have at least one teacher-subject mapping
-        if (empty($this->teacherSubjectMappings)) {
-            $this->dispatch('toast', [
-                'type' => 'error', 
-                'message' => 'Please add at least one teacher-subject mapping.'
-            ]);
-            return;
+        // Try to get class/section from classSectionId if no class is directly selected
+        if (empty($this->bulkForm['selected_class_id']) && !empty($this->classSectionId)) {
+            $this->updatedClassSectionId($this->classSectionId);
         }
         
-        // Check for incomplete mappings
-        $incomplete = false;
-        foreach ($this->teacherSubjectMappings as $mappingId => $mapping) {
-            if (empty($mapping['teacherId']) || empty($mapping['subjectId'])) {
-                $incomplete = true;
-                // Add specific validation errors
-                if (empty($mapping['teacherId'])) {
-                    $this->addError("teacherSubjectMappings.{$mappingId}.teacherId", 'Please select a teacher');
-                }
-                if (empty($mapping['subjectId'])) {
-                    $this->addError("teacherSubjectMappings.{$mappingId}.subjectId", 'Please select a subject');
-                }
-            }
-        }
-        
-        if ($incomplete) {
-            $this->dispatch('toast', [
-                'type' => 'error', 
-                'message' => 'Please complete all teacher-subject mappings.'
-            ]);
-            return;
-        }
-        
-        // Validate form inputs
+        // Validate basic form data
         $this->validate([
             'bulkForm.academic_year_id' => 'required',
             'bulkForm.academic_term' => 'required',
-            'bulkForm.class_ids' => 'required|array|min:1',
-            'bulkForm.section_ids' => 'required|array|min:1',
+            'bulkForm.selected_class_id' => 'required',
+            'teacherSubjectMappings' => 'required|array|min:1',
         ], [
+            'teacherSubjectMappings.required' => 'Please add at least one teacher-subject pair.',
+            'teacherSubjectMappings.min' => 'Please add at least one teacher-subject pair.',
+            'bulkForm.selected_class_id.required' => 'Please select a class.',
             'bulkForm.academic_year_id.required' => 'Please select an academic year.',
             'bulkForm.academic_term.required' => 'Please select an academic term.',
-            'bulkForm.class_ids.required' => 'Please select at least one class.',
-            'bulkForm.class_ids.min' => 'Please select at least one class.',
-            'bulkForm.section_ids.required' => 'Please select at least one section for each class.',
-            'bulkForm.section_ids.min' => 'Please select at least one section for each class.',
         ]);
         
-        // Perform validations for potential issues
-        $validationResults = $this->validateBulkAssignments();
-        if (!empty($validationResults['error'])) {
-            $this->dispatch('toast', [
-                'type' => 'error',
-                'message' => $validationResults['error']
+        // Validate each mapping has both teacher and subject
+        foreach ($this->teacherSubjectMappings as $index => $mapping) {
+            $this->validate([
+                "teacherSubjectMappings.{$index}.teacherId" => 'required',
+                "teacherSubjectMappings.{$index}.subjectId" => 'required',
+            ], [
+                "teacherSubjectMappings.{$index}.teacherId.required" => 'Please select a teacher.',
+                "teacherSubjectMappings.{$index}.subjectId.required" => 'Please select a subject.',
             ]);
-            return;
         }
-        
-        // Display warnings if any and ask for confirmation
-        if (!empty($validationResults['warning'])) {
-            $this->dispatch('confirm-bulk-assignment', [
-                'message' => $validationResults['warning'],
-                'callback' => 'confirmBulkAssignment'
-            ]);
-            return;
-        }
-        
-        // If no warnings, proceed directly with the assignment process
+
+        // Process bulk assignments
         $this->processBulkAssignmentConfirmed();
-    }
-
-    /**
-     * Validate bulk assignments for potential issues
-     * 
-     * @return array
-     */
-    private function validateBulkAssignments()
-    {
-        $result = [
-            'error' => null,
-            'warning' => null
-        ];
-        
-        // Check if any teacher-subject mappings are provided
-        if (empty($this->teacherSubjectMappings)) {
-            $result['error'] = 'Please add at least one teacher-subject mapping.';
-            return $result;
-        }
-        
-        // Check if any classes are selected
-        if (empty($this->bulkForm['class_ids'])) {
-            $result['error'] = 'Please select at least one class.';
-            return $result;
-        }
-        
-        // Check if any sections are selected
-        if (empty($this->bulkForm['section_ids'])) {
-            $result['error'] = 'Please select at least one section.';
-            return $result;
-        }
-        
-        // Check if section selections are all valid for the selected classes
-        if (!empty($this->bulkForm['section_ids'])) {
-            $validSectionIds = Section::whereIn('my_class_id', $this->bulkForm['class_ids'])
-                ->pluck('id')
-                ->toArray();
-                
-            $invalidSections = array_diff($this->bulkForm['section_ids'], $validSectionIds);
-            
-            if (!empty($invalidSections)) {
-                $result['error'] = 'Some selected sections do not belong to the selected classes.';
-                return $result;
-            }
-        }
-        
-        // Check for incomplete mappings
-        foreach ($this->teacherSubjectMappings as $mappingId => $mapping) {
-            if (empty($mapping['teacherId']) || empty($mapping['subjectId'])) {
-                if (empty($mapping['teacherId'])) {
-                    $result['error'] = 'Please select a teacher for all mappings.';
-                }
-                if (empty($mapping['subjectId'])) {
-                    $result['error'] = $result['error'] 
-                        ? $result['error'] . ' Please select a subject for all mappings.' 
-                        : 'Please select a subject for all mappings.';
-                }
-                return $result;
-            }
-        }
-        
-        // Check for potential workload issues
-        $workloadWarning = $this->checkTeacherWorkload();
-        if ($workloadWarning) {
-            if (empty($result['warning'])) {
-                $result['warning'] = $workloadWarning;
-            } else {
-                $result['warning'] .= ' ' . $workloadWarning;
-            }
-        }
-        
-        // Count how many teacher-subject mappings are being created
-        $mappingCount = count($this->teacherSubjectMappings);
-        $sectionCount = count($this->bulkForm['section_ids']);
-        
-        // Calculate total potential assignments
-        $totalPotentialAssignments = $mappingCount * $sectionCount;
-        
-        // Warn if creating a large number of assignments
-        if ($totalPotentialAssignments > 50) {
-            if (empty($result['warning'])) {
-                $result['warning'] = "You are about to create up to {$totalPotentialAssignments} assignments.";
-            } else {
-                $result['warning'] .= " You are about to create up to {$totalPotentialAssignments} assignments.";
-            }
-        }
-        
-        return $result;
-    }
-
-    /**
-     * Check teacher workload and potential scheduling conflicts
-     * 
-     * @return string|null
-     */
-    private function checkTeacherWorkload()
-    {
-        $warnings = [];
-        $maxRecommendedAssignments = 20;
-        $teacherIds = [];
-        
-        // Get all unique teacher IDs from mappings
-        foreach ($this->teacherSubjectMappings as $mapping) {
-            if (!empty($mapping['teacherId']) && !in_array($mapping['teacherId'], $teacherIds)) {
-                $teacherIds[] = $mapping['teacherId'];
-            }
-        }
-        
-        // Calculate current and potential new assignments for each teacher
-        foreach ($teacherIds as $teacherId) {
-            // Get current assignment count
-            $currentAssignments = TeacherSubjectAssignment::where('teacher_id', $teacherId)
-                ->where('academic_year_id', $this->bulkForm['academic_year_id'])
-                ->where('academic_term', $this->bulkForm['academic_term'])
-                ->count();
-            
-            // Count potential new assignments for this teacher
-            $teacherMappingsCount = 0;
-            foreach ($this->teacherSubjectMappings as $mapping) {
-                if ($mapping['teacherId'] == $teacherId) {
-                    $teacherMappingsCount++;
-                }
-            }
-            
-            $potentialNewAssignments = 0;
-            if (!empty($this->bulkForm['section_ids'])) {
-                $potentialNewAssignments = $teacherMappingsCount * count($this->bulkForm['section_ids']);
-            } else {
-                $potentialNewAssignments = $teacherMappingsCount * count($this->bulkForm['class_ids']);
-            }
-            
-            $totalPotentialAssignments = $currentAssignments + $potentialNewAssignments;
-            
-            // Check if teacher will exceed recommended assignments
-            if ($totalPotentialAssignments > $maxRecommendedAssignments) {
-                // Get teacher name
-                $teacher = User::find($teacherId);
-                $teacherName = $teacher ? $teacher->name : "Teacher #{$teacherId}";
-                
-                $warnings[] = "{$teacherName} will have {$totalPotentialAssignments} assignments (currently has {$currentAssignments}).";
-                
-                // Check for scheduling conflicts
-                $schedulingWarning = $this->checkSchedulingConflicts($teacherId);
-                if ($schedulingWarning) {
-                    $warnings[] = $schedulingWarning;
-                }
-            }
-        }
-        
-        return !empty($warnings) ? implode(' ', $warnings) : null;
-    }
-
-    /**
-     * Check potential scheduling conflicts for a teacher
-     * 
-     * @param int $teacherId
-     * @return string|null
-     */
-    private function checkSchedulingConflicts(int $teacherId)
-    {
-        // Get teacher name
-        $teacher = User::find($teacherId);
-        $teacherName = $teacher ? $teacher->name : "Teacher #{$teacherId}";
-        
-        // Get existing classes/sections this teacher is assigned to
-        $existingAssignments = TeacherSubjectAssignment::where('teacher_id', $teacherId)
-            ->where('academic_year_id', $this->bulkForm['academic_year_id'])
-            ->where('academic_term', $this->bulkForm['academic_term'])
-            ->select('class_id', 'section_id')
-            ->distinct()
-            ->get();
-            
-        $existingClassSectionCount = $existingAssignments->count();
-        
-        // Count new unique class/section combinations from mappings
-        $newClassSections = [];
-        foreach ($this->teacherSubjectMappings as $mapping) {
-            if ($mapping['teacherId'] == $teacherId) {
-                if (empty($this->bulkForm['section_ids'])) {
-                    foreach ($this->bulkForm['class_ids'] as $classId) {
-                        $key = "{$classId}_null";
-                        $newClassSections[$key] = true;
-                    }
-                } else {
-                    foreach ($this->bulkForm['section_ids'] as $sectionId) {
-                        // Get class ID for this section
-                        $section = Section::find($sectionId);
-                        if ($section) {
-                            $classId = $section->my_class_id;
-                            $key = "{$classId}_{$sectionId}";
-                            $newClassSections[$key] = true;
-                        }
-                    }
-                }
-            }
-        }
-        
-        $newClassSectionCount = count($newClassSections);
-        $totalClassSectionCount = $existingClassSectionCount + $newClassSectionCount;
-        
-        // Warn if teacher has a high number of different classes/sections
-        if ($totalClassSectionCount > 8) {
-            return "{$teacherName} will be teaching in {$totalClassSectionCount} different classes/sections, which may cause scheduling conflicts.";
-        }
-        
-        return null;
     }
 
     /**
@@ -1056,30 +889,48 @@ class SubjectTeacherAssignment extends Component
     public function processBulkAssignmentConfirmed()
     {
         try {
-            \DB::beginTransaction();
+            // Debug info
+            \Log::info('Processing bulk assignments', [
+                'mappings' => $this->teacherSubjectMappings,
+                'class_id' => $this->bulkForm['selected_class_id'],
+                'section_ids' => $this->bulkForm['section_ids'] ?? [],
+                'academic_year' => $this->bulkForm['academic_year_id'],
+                'academic_term' => $this->bulkForm['academic_term'],
+                'is_primary' => $this->bulkForm['is_primary'],
+                'is_active' => $this->bulkForm['is_active'],
+                'override_existing' => $this->bulkForm['override_existing'],
+            ]);
             
-            $total = 0;
+            // Initialize counters
             $created = 0;
             $skipped = 0;
             $errors = 0;
+            $total = 0;
             
-            // Process academic year format
-            $academicYear = $this->bulkForm['academic_year_id'];
-            if (strpos($academicYear, '-') !== false) {
-                $parts = explode('-', $academicYear);
-                if (count($parts) == 2) {
-                    $academicYear = trim($parts[0]) . '-' . trim($parts[1]);
+            // Get the selected class ID
+            $classId = $this->bulkForm['selected_class_id'];
+            
+            // If we're using classSectionId and have no section_ids, extract from classSectionId
+            if (empty($this->bulkForm['section_ids']) && !empty($this->classSectionId)) {
+                $classSection = collect($this->classSections)->firstWhere('id', $this->classSectionId);
+                if ($classSection) {
+                    $this->bulkForm['section_ids'] = [$this->classSectionId];
                 }
             }
+            
+            // Get academic year
+            $academicYear = $this->bulkForm['academic_year_id'];
+            
+            // Loop through each teacher-subject mapping
+            DB::beginTransaction();
             
             // Process each teacher-subject mapping
             foreach ($this->teacherSubjectMappings as $mapping) {
                 $teacherId = $mapping['teacherId'];
                 $subjectId = $mapping['subjectId'];
                 
-                // If no sections selected, create assignments for all classes without sections
+                // If no sections selected, create an assignment for the class without sections
                 if (empty($this->bulkForm['section_ids'])) {
-                    foreach ($this->bulkForm['class_ids'] as $classId) {
                         $total++;
                         
                         // Check if assignment already exists
@@ -1110,7 +961,7 @@ class SubjectTeacherAssignment extends Component
                         }
                         
                         try {
-                            // Verify this assignment is still valid after any previous assignments in this session
+                        // Verify this assignment is still valid
                             if (!$this->isValidAssignment($classId, null, $subjectId, $academicYear, $this->bulkForm['academic_term'])) {
                                 $skipped++;
                                 continue;
@@ -1154,25 +1005,16 @@ class SubjectTeacherAssignment extends Component
                             ]);
                             
                             $errors++;
-                        }
                     }
                 } else {
                     // Create assignments for selected sections
                     foreach ($this->bulkForm['section_ids'] as $sectionId) {
                         $total++;
                         
-                        // Get the class ID for this section
+                        // Get the section and verify it belongs to the selected class
                         $section = Section::find($sectionId);
-                        if (!$section) {
+                        if (!$section || $section->my_class_id != $classId) {
                             $errors++;
-                            continue;
-                        }
-                        
-                        $classId = $section->my_class_id;
-                        
-                        // Verify this is a valid class selection (section belongs to selected classes)
-                        if (!in_array($classId, $this->bulkForm['class_ids'])) {
-                            $skipped++;
                             continue;
                         }
                         
@@ -1204,7 +1046,7 @@ class SubjectTeacherAssignment extends Component
                         }
                         
                         try {
-                            // Verify this assignment is still valid after any previous assignments in this session
+                            // Verify this assignment is still valid
                             if (!$this->isValidAssignment($classId, $sectionId, $subjectId, $academicYear, $this->bulkForm['academic_term'])) {
                                 $skipped++;
                                 continue;
@@ -1377,11 +1219,11 @@ class SubjectTeacherAssignment extends Component
                 $query->where('is_active', true);
             }
             
-            $this->selectedAssignments = $query->pluck('id')->map(function($id) {
+            $this->selectedIds = $query->pluck('id')->map(function($id) {
                 return (string) $id;
             })->toArray();
         } else {
-            $this->selectedAssignments = [];
+            $this->selectedIds = [];
         }
     }
     
@@ -1390,7 +1232,7 @@ class SubjectTeacherAssignment extends Component
      */
     public function openBulkDeleteModal()
     {
-        if (count($this->selectedAssignments) === 0) {
+        if (count($this->selectedIds) === 0) {
             $this->dispatch('toast', [
                 'type' => 'error', 
                 'message' => 'Please select at least one assignment to delete.'
@@ -1413,17 +1255,18 @@ class SubjectTeacherAssignment extends Component
             'failed' => 0,
             'total' => 0,
         ];
+        $this->showBulkDeleteResults = false;
     }
     
     /**
-     * Delete assignments in bulk
+     * Delete selected assignments in bulk
      */
     public function bulkDelete()
     {
-        if (count($this->selectedAssignments) === 0) {
+        if (count($this->selectedIds) === 0) {
             $this->dispatch('toast', [
                 'type' => 'error', 
-                'message' => 'No assignments selected for deletion.'
+                'message' => 'No assignments selected for deletion'
             ]);
             return;
         }
@@ -1431,27 +1274,36 @@ class SubjectTeacherAssignment extends Component
         try {
             $deleted = 0;
             $failed = 0;
-            $total = count($this->selectedAssignments);
+            $total = count($this->selectedIds);
             
             // Begin transaction for bulk operation
             \DB::beginTransaction();
             
-            foreach ($this->selectedAssignments as $id) {
+            foreach ($this->selectedIds as $id) {
                 try {
                     $assignment = TeacherSubjectAssignment::find($id);
+                    
                     if ($assignment) {
+                        // Check if user has permission to delete
+                        if (Gate::allows('delete', $assignment)) {
                         $assignment->delete();
                         $deleted++;
+                        } else {
+                            $failed++;
+                        }
                     } else {
                         $failed++;
                     }
                 } catch (\Exception $e) {
-                    \Log::error("Failed to delete assignment #$id: " . $e->getMessage());
+                    \Log::error('Error deleting assignment: ' . $e->getMessage(), [
+                        'id' => $id,
+                        'exception' => $e,
+                    ]);
                     $failed++;
                 }
             }
             
-            // Commit the transaction
+            // Commit transaction
             \DB::commit();
             
             // Update results
@@ -1462,25 +1314,26 @@ class SubjectTeacherAssignment extends Component
             ];
             
             $this->showBulkDeleteResults = true;
-            $this->selectedAssignments = [];
+            $this->selectedIds = [];
             $this->selectAll = false;
             
-            // Display success message
+            // Dispatch toast
             $this->dispatch('toast', [
                 'type' => 'success', 
-                'message' => "Successfully deleted $deleted assignments."
+                'message' => "Deleted {$deleted} assignments successfully" . ($failed > 0 ? ", {$failed} failed" : "")
             ]);
-            
         } catch (\Exception $e) {
-            // Rollback on error
+            // Rollback transaction on error
             \DB::rollBack();
+            
+            \Log::error('Bulk delete error: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
             
             $this->dispatch('toast', [
                 'type' => 'error', 
-                'message' => 'Error during bulk deletion: ' . $e->getMessage()
+                'message' => 'Error during bulk delete: ' . $e->getMessage()
             ]);
-            
-            \Log::error('Bulk deletion error: ' . $e->getMessage());
         }
     }
     
@@ -1541,7 +1394,7 @@ class SubjectTeacherAssignment extends Component
         
         // Get current academic year from settings if not specified
         if (empty($this->academicYear)) {
-            $currentSession = $this->getSettingRepo()->getSetting('current_session')->first();
+            $currentSession = $this->getSetting('current_session')->first();
             $this->academicYear = $currentSession ? $currentSession->description : '2023-2024';
         }
         
@@ -1576,8 +1429,8 @@ class SubjectTeacherAssignment extends Component
         }
         
         // For specific selection of assignments
-        if (!empty($this->selectedAssignments)) {
-            $query->whereIn('id', $this->selectedAssignments);
+        if (!empty($this->selectedIds)) {
+            $query->whereIn('id', $this->selectedIds);
         }
         
         // Log the SQL query being executed (for debugging)
@@ -1591,92 +1444,6 @@ class SubjectTeacherAssignment extends Component
         ]);
         
         return $query;
-    }
-
-    /**
-     * Handle updates to the class_ids field in the bulk form
-     */
-    public function updatedBulkFormClassIds($value)
-    {
-        // Set a flag to show loading indicator
-        $this->processingSections = true;
-        $this->availableSections = collect(); // Initialize as a collection
-        
-        // Clear previous section selections whenever the classes change
-        $this->bulkForm['section_ids'] = [];
-        
-        // Debug log the class_ids to make sure we're receiving them
-        \Log::info('Class IDs updated for bulk assignment', [
-            'class_ids' => $this->bulkForm['class_ids'],
-            'value' => $value,
-            'has_class_ids' => !empty($this->bulkForm['class_ids']),
-            'class_ids_count' => count($this->bulkForm['class_ids'])
-        ]);
-        
-        if (!empty($this->bulkForm['class_ids'])) {
-            try {
-                $availableSections = collect();
-                
-                // Load sections for each selected class
-                foreach ($this->bulkForm['class_ids'] as $classId) {
-                    $class = MyClass::find($classId);
-                    if ($class) {
-                        // Use the relationship defined in MyClass model
-                        $sections = $class->sections()->orderBy('name')->get();
-                        if ($sections->count() > 0) {
-                            $availableSections->put($classId, $sections);
-                        }
-                    }
-                }
-                
-                $this->availableSections = $availableSections;
-                
-                $totalSections = $availableSections->flatten(1)->count();
-                
-                \Log::info('Loaded sections for bulk assignment', [
-                    'class_ids' => $this->bulkForm['class_ids'],
-                    'sections_count' => $totalSections,
-                    'grouped_count' => $availableSections->count()
-                ]);
-                
-                // User feedback
-                if ($totalSections > 0) {
-                    $this->dispatch('toast', [
-                        'type' => 'success', 
-                        'message' => "Loaded {$totalSections} sections for selected classes"
-                    ]);
-                } else {
-                    $this->dispatch('toast', [
-                        'type' => 'warning', 
-                        'message' => "No sections found for the selected classes. Please select classes that have sections."
-                    ]);
-                }
-            } catch (\Exception $e) {
-                \Log::error('Error loading sections for bulk assignment', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                
-                // User feedback
-                $this->dispatch('toast', [
-                    'type' => 'error', 
-                    'message' => 'Error loading sections: ' . $e->getMessage()
-                ]);
-            }
-        } else {
-            // Reset sections when no classes are selected
-            $this->bulkForm['section_ids'] = [];
-            $this->availableSections = collect();
-            
-            // User feedback
-            $this->dispatch('toast', [
-                'type' => 'info', 
-                'message' => 'No classes selected, sections cleared'
-            ]);
-        }
-        
-        // Turn off the loading indicator
-        $this->processingSections = false;
     }
 
     /**
@@ -1768,7 +1535,7 @@ class SubjectTeacherAssignment extends Component
             ]);
         } else {
             Log::info('No sections available to debug', [
-                'bulk_form_class_ids' => $this->bulkForm['class_ids'] ?? []
+                'bulk_form_class_ids' => $this->bulkForm['selected_class_id'] ?? []
             ]);
             
             $this->dispatch('toast', [
@@ -1777,4 +1544,113 @@ class SubjectTeacherAssignment extends Component
             ]);
         }
     }
+
+    /**
+     * Load all class sections (class + section combinations)
+     */
+    public function loadClassSections()
+    {
+        $this->classSections = DB::table('sections')
+            ->join('my_classes', 'sections.my_class_id', '=', 'my_classes.id')
+            ->select(
+                'sections.id as id',
+                'my_classes.id as class_id',
+                'my_classes.name as class_name',
+                'sections.name as section_name'
+            )
+            ->orderBy('my_classes.name')
+            ->orderBy('sections.name')
+            ->get();
+            
+        // Add class information to each section
+        foreach ($this->classSections as $key => $section) {
+            $this->classSections[$key]->class = (object)[
+                'id' => $section->class_id,
+                'name' => $section->class_name
+            ];
+            
+            $this->classSections[$key]->section = (object)[
+                'id' => $section->id,
+                'name' => $section->section_name
+            ];
+        }
+    }
+    
+    /**
+     * Handle changes to classSectionId
+     */
+    public function updatedClassSectionId($value)
+    {
+        if (empty($value)) {
+            return;
+        }
+        
+        // Find the class section in the collection
+        $classSection = collect($this->classSections)->firstWhere('id', $value);
+        
+        if ($classSection) {
+            // Update the bulkForm with the selected class and section
+            $this->bulkForm['selected_class_id'] = $classSection->class_id;
+            $this->bulkForm['section_ids'] = [$value]; // Set the section ID
+            
+            // For debugging
+            $this->dispatch('toast', [
+                'type' => 'info', 
+                'message' => "Selected class section: {$classSection->class_name} {$classSection->section_name}"
+            ]);
+        }
+    }
+
+    /**
+     * Get settings from the database
+     * 
+     * @param string $key The setting key to get
+     * @return \Illuminate\Support\Collection
+     */
+    protected function getSetting($key)
+    {
+        // This is a simplified version without the SettingRepo dependency
+        // You should replace this with the appropriate way to get settings in your application
+        
+        // For 'session', return a collection of academic years
+        if ($key === 'session') {
+            return collect($this->academicYears);
+        }
+        
+        // For 'current_session', return a collection with the current session
+        if ($key === 'current_session') {
+            $currentYear = date('Y');
+            $currentAcademicYear = ($currentYear) . '-' . ($currentYear + 1);
+            
+            return collect([
+                (object)[
+                    'description' => $currentAcademicYear,
+                    'is_current' => true
+                ]
+            ]);
+        }
+        
+        // Default
+        return collect([]);
+    }
+
+    /**
+     * Display a notification to the user
+     */
+    public function notify($type, $message, $title = null)
+    {
+        // Dispatch toast event for displaying notifications
+        $data = [
+            'type' => $type,
+            'message' => $message
+        ];
+        
+        if ($title) {
+            $data['title'] = $title;
+        }
+        
+        $this->dispatch('toast', $data);
+    }
 }
+
+

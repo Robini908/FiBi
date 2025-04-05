@@ -33,7 +33,7 @@
                 </button>
                 <button x-show="activeTab === 'grading-management'" 
                         type="button" 
-                        onclick="Livewire.dispatch('openModal', { component: 'create-grading-system' })"
+                        onclick="Livewire.dispatch('openModal', { component: { component: 'create-grading-system' } })"
                         class="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     <svg class="-ml-0.5 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />

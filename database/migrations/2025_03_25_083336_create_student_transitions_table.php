@@ -40,7 +40,7 @@ return new class extends Migration
             $table->timestamps(); // created_at and updated_at
             
             // Add indexes for better query performance
-            $table->index(['student_id', 'from_academic_year', 'to_academic_year']);
+            $table->index(['student_id', 'from_academic_year', 'to_academic_year'], 'student_transitions_academic_idx');
             $table->index(['student_id', 'is_active']);
             $table->index(['from_class_id', 'to_class_id']);
             

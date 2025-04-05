@@ -6,7 +6,7 @@ use App\Models\StudentFeePayment;
 use App\Models\StudentRecord;
 use App\Models\FeeStructure;
 use App\Models\Setting;
-use App\Models\User;
+use App\User;
 use App\Services\MpesaService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;

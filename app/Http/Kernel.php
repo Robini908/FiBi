@@ -76,12 +76,17 @@ class Kernel extends HttpKernel
         'admin' => \App\Http\Middleware\Custom\Admin::class,
         'super_admin' => \App\Http\Middleware\Custom\SuperAdmin::class,
         
+        // Role-based middleware
+        'role' => \App\Http\Middleware\RoleMiddleware::class,
+        
         // Role-based middleware (new descriptive names)
         'administrator' => \App\Http\Middleware\Custom\TeamSA::class,
         'administrator_teacher' => \App\Http\Middleware\Custom\TeamSAT::class,
         'administrator_accountant' => \App\Http\Middleware\Custom\TeamAdministratorAccount::class,
         'accountant' => \App\Http\Middleware\Custom\TeamAccount::class,
         'teacher' => \App\Http\Middleware\Custom\Teacher::class,
+        'librarian' => \App\Http\Middleware\Custom\Librarian::class,
+        'librarian_only' => \App\Http\Middleware\Custom\LibrarianOnly::class,
         'student' => \App\Http\Middleware\Custom\Student::class,
         'parent' => \App\Http\Middleware\Custom\MyParent::class,
         'academic' => \App\Http\Middleware\Custom\Academic::class,

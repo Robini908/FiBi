@@ -8,7 +8,7 @@ use App\Models\StudentFeePayment;
 use App\Models\StudentRecord;
 use App\Models\StudentArrear;
 use App\Models\MyClass;
-use App\Models\User;
+use App\User;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;

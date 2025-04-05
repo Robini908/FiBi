@@ -8,6 +8,14 @@ export default {
     "./resources/views/livewire/**/*.blade.php",
     './vendor/usernotnull/tall-toasts/config/**/*.php',
     './vendor/usernotnull/tall-toasts/resources/views/**/*.blade.php',
+    './vendor/wire-elements/modal/resources/views/*.blade.php',
+    './storage/framework/views/*.php',
+  ],
+  safelist: [
+    {
+      pattern: /max-w-(sm|md|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl)/,
+      variants: ['sm', 'md', 'lg', 'xl', '2xl']
+    }
   ],
   theme: {
     extend: {

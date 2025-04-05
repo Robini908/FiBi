@@ -33,6 +33,11 @@ Route::get('/create-school/{name}', function ($name) {
 
 Route::middleware('auth')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    
+    // Wire Elements Modal Demo
+    Route::get('/modal-demo', function() {
+        return view('livewire.modal-demo');
+    })->name('modal.demo');
 });
 
 Route::middleware('auth')->group(function () {
@@ -64,6 +69,11 @@ Route::group(['middleware' => ['auth', 'administrator_teacher']], function () {
     Route::get('/pages/support_team/exams/assign-exam-marks', function () {
         return view('pages.support_team.exams.assign-exam-marks');
     })->name('exams.assignExamMarks');
+    
+    // New modern Google-inspired exam management system
+    Route::get('/exams/modern-management', function () {
+        return view('pages.exams.modern-management');
+    })->name('exams.modern-management');
 });
 
 // Student promotion routes - accessible by administrators
@@ -205,6 +215,16 @@ Route::group(['middleware' => 'auth'], function () {
             Route::get('/consolidated/export/pdf', [App\Http\Controllers\ConsolidatedTimetableController::class, 'exportPdf'])->name('tt.consolidated.export.pdf');
             Route::get('/consolidated/export/excel', [App\Http\Controllers\ConsolidatedTimetableController::class, 'exportExcel'])->name('tt.consolidated.export.excel');
             Route::get('/consolidated/print', [App\Http\Controllers\ConsolidatedTimetableController::class, 'printView'])->name('tt.consolidated.print');
+            
+            // Exam Timetable routes
+            Route::get('/exam-timetable', function() {
+                return view('pages.support_team.timetables.exam-timetable');
+            })->name('exam.timetable');
+            
+            // Exam Timetable export routes
+            Route::get('/exam-timetable/export/pdf/{examId}/{classId}/{sectionId?}', [App\Http\Controllers\ExamTimetableController::class, 'exportPdf'])->name('exam.timetable.export.pdf');
+            Route::get('/exam-timetable/export/excel/{examId}/{classId}/{sectionId?}', [App\Http\Controllers\ExamTimetableController::class, 'exportExcel'])->name('exam.timetable.export.excel');
+            Route::get('/exam-timetable/print/{examId}/{classId}/{sectionId?}', [App\Http\Controllers\ExamTimetableController::class, 'printView'])->name('exam.timetable.print');
 
             /*************** TimeTable Records *****************/
             Route::group(['prefix' => 'records'], function () {
@@ -298,6 +318,17 @@ Route::group(['middleware' => 'auth'], function () {
         Route::get('users/{id}', 'UserController@show')->name('users.show');
         Route::get('payments/{id}', 'PaymentController@show')->name('payments.show');
     });
+});
+
+// Student routes - accessible by students
+Route::group(['middleware' => ['auth', 'student']], function () {
+    Route::get('/pages/student/my-exams', function () {
+        return view('pages.student.my-exams');
+    })->name('student.my-exams');
+
+    Route::get('/pages/student/my-marks', function () {
+        return view('pages.student.my-marks');
+    })->name('student.my-marks');
 });
 
 /************************ SUPER ADMIN ****************************/
@@ -454,6 +485,63 @@ Route::group(['prefix' => 'attendance', 'middleware' => 'auth'], function () {
         ->middleware('administrator_teacher');
 });
 
+// Library Routes
+Route::group(['prefix' => 'library', 'middleware' => 'auth'], function () {
+    // Books Management
+    Route::get('/books', 'App\Http\Controllers\Library\LibraryController@books')
+        ->name('library.books')
+        ->middleware('role:librarian,admin,super_admin,teacher');
+        
+    // Export books to Excel
+    Route::get('/books/export', 'App\Http\Controllers\Library\LibraryController@exportBooks')
+        ->name('library.books.export')
+        ->middleware('role:librarian,teacher,admin,super_admin');
+
+    // Categories Management
+    Route::get('/categories', 'App\Http\Controllers\Library\LibraryController@categories')
+        ->name('library.categories')
+        ->middleware('role:librarian,admin,super_admin');
+        
+    // Authors Management
+    Route::get('/authors', 'App\Http\Controllers\Library\LibraryController@authors')
+        ->name('library.authors')
+        ->middleware('role:librarian,admin,super_admin');
+        
+    // Inventory Management
+    Route::get('/inventory', 'App\Http\Controllers\Library\LibraryController@inventory')
+        ->name('library.inventory')
+        ->middleware('role:librarian,admin,super_admin');
+        
+    // Loans Management
+    Route::get('/loans', 'App\Http\Controllers\Library\LibraryController@loans')
+        ->name('library.loans')
+        ->middleware('role:librarian,admin,super_admin');
+        
+    // Book Requests Management 
+    Route::get('/book-requests', 'App\Http\Controllers\Library\LibraryController@bookRequests')
+        ->name('library.book-requests')
+        ->middleware('role:librarian,admin,super_admin');
+        
+    // Library Reports
+    Route::get('/reports', 'App\Http\Controllers\Library\LibraryController@reports')
+        ->name('library.reports')
+        ->middleware('role:librarian,admin,super_admin,accountant');
+        
+    // Book Catalog - accessible to all authenticated users
+    Route::get('/catalog', 'App\Http\Controllers\Library\LibraryController@catalog')
+        ->name('library.catalog');
+        
+    // Student's borrowed books
+    Route::get('/my-books', 'App\Http\Controllers\Library\LibraryController@myBooks')
+        ->name('library.my-books')
+        ->middleware('role:student');
+        
+    // Parent's children borrowed books
+    Route::get('/my-children-books', 'App\Http\Controllers\Library\LibraryController@myChildrenBooks')
+        ->name('library.my-children-books')
+        ->middleware('role:parent');
+});
+
 // LGA Route - Returns empty array since we've removed LGA functionality
 Route::get('/get_lga/{id}', 'AjaxController@get_lga')->name('get_lga')->middleware('auth');
 
@@ -514,4 +602,9 @@ Route::prefix('staff')->name('staff.')->middleware(['auth', 'checkUserType:admin
 
 // Diagnostic route - only available in debug mode
 Route::get('/diagnostic', 'App\Http\Controllers\DiagnosticController@index')->name('diagnostic');
+
+// Test route to verify role middleware
+Route::get('/test-role-middleware', function () {
+    return 'Role middleware is working correctly!';
+})->middleware('role:librarian,admin')->name('test.role.middleware');
 
