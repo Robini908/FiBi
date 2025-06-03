@@ -1,0 +1,15 @@
+ "Attendance Report"
+Student,"Alfredo Reynolds"
+"Admission No",ADM00037
+Class,"Form 1 Silver"
+Period,"2025-01-01 to 2025-06-03"
+
+Statistics
+"Total Days",0
+Present,0
+Absent,0
+Late,0
+Excused,0
+"Attendance Rate",0%
+
+Date,Session,Status,"Time In","Minutes Late",Remarks

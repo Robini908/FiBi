@@ -66,14 +66,7 @@
                 </span>
             </a>
 
-            <!-- Wire Elements Modal Demo (Developer Tools) -->
-            <a href="{{ route('modal.demo') }}"
-               class="{{ Request::is('modal-demo*') ? 'bg-green-50 text-green-700 border-l-4 border-green-500' : 'text-gray-600 hover:bg-gray-50 hover:text-green-700' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-150">
-                <svg class="{{ Request::is('modal-demo*') ? 'text-green-500' : 'text-gray-400 group-hover:text-green-500' }} mr-3 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span class="truncate">Modal Demo</span>
-            </a>
+           
 
             <!-- Registration Section -->
             @if ((Qs::isAdministratorOrTeacher() || Qs::isParent() || Qs::isStudent()) && !Qs::isLibrarian())
@@ -242,10 +235,8 @@
                     <a href="{{ Qs::isAdministratorOrTeacher() ? route('exams.modern-management') : (Qs::isParent() ? route('parent.child-exams') : route('student.my-exams')) }}"
                        class="{{ in_array(Route::currentRouteName(), ['exams.modern-management', 'parent.child-exams', 'student.my-exams']) ? 'text-green-700 font-medium' : 'text-gray-600 hover:text-green-700' }} group flex items-center py-2 text-sm rounded-md">
                         <span class="truncate">
-                            <svg class="inline-block w-4 h-4 mr-1 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                            Modern Exam System
+                            
+                           Exam System
                         </span>
                     </a>
 

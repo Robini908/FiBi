@@ -45,7 +45,7 @@ return new class extends Migration
             $table->boolean('is_suspended')->default(false);
             $table->text('suspension_reason')->nullable();
             $table->unsignedInteger('suspended_by')->nullable();
-            $table->text('notification_content')->nullable();
+            $table->text('notification_content');
             $table->timestamp('suspension_date')->nullable();
             $table->enum('suspension_type', ['dismissal', 'withdrawal', 'permanent_exclusion'])->nullable();
             $table->timestamp('suspension_end_date')->nullable();

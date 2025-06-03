@@ -37,8 +37,6 @@
 
 <body class="h-full font-sans antialiased bg-gray-50" x-data="{ sidebarOpen: false }">
     <livewire:toasts />
-     <!-- Wire Elements Modal -->
-     @livewire('wire-elements-modal')
     
 
     <div class="min-h-full">
@@ -129,7 +127,7 @@
     <x-notifications />
 
 
-    @notificationScripts
+   
     @stack('scripts')
 </body>
 </html>

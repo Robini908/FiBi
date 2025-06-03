@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
-use Illuminate\Pagination\Paginator;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Cookie\CookieJar;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Database\Eloquent\Model;
+
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,16 +29,9 @@ class AppServiceProvider extends ServiceProvider
             config('session.same_site', 'lax')
         );
         
-        // Register Blade components
-        \Illuminate\Support\Facades\Blade::component('livewire-modal', \App\View\Components\LivewireModal::class);
-        
-        // Register Livewire components for modals
-        if (class_exists(\Livewire\Livewire::class)) {
-            \Livewire\Livewire::component('library.authors.author-form', \App\Livewire\Library\Authors\AuthorForm::class);
-            \Livewire\Livewire::component('library.authors.author-view', \App\Livewire\Library\Authors\AuthorView::class);
-            \Livewire\Livewire::component('library.authors.author-delete', \App\Livewire\Library\Authors\AuthorDelete::class);
-            \Livewire\Livewire::component('library.authors.author-management', \App\Http\Livewire\Library\Authors\AuthorManagement::class);
-        }
+        Model::preventSilentlyDiscardingAttributes($this->app->isLocal());
+  
+       
     }
 
     /**

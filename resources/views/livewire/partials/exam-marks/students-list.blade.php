@@ -2,7 +2,8 @@
     {{-- Students List with Google Material Design 3 --}}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200"
          x-data="{ 
-            showGradeMenu: false,
+            showGradeMenu: null,
+            editing: null,
             refreshing: false,
             lastUpdate: null,
             init() {
@@ -14,8 +15,8 @@
             }
          }"
          x-init="init()"
-         :class="{ 'opacity-50': refreshing }"
-         wire:poll.10s>
+         :class="{ 'opacity-70': refreshing }"
+         wire:poll.30s>
 
         {{-- Header --}}
         <div class="bg-gradient-to-r from-green-600 to-teal-700 px-6 py-4 rounded-t-lg">
@@ -29,7 +30,8 @@
                     <div>
                         <h2 class="text-xl font-medium text-white">Assign Marks</h2>
                         <p class="mt-1 text-sm text-white/80">
-                            {{ $sections->where('id', $selectedSection)->first()->name }} • {{ $selectedClassName }}
+                            {{ $sections->where('id', $selectedSection)->first()->name ?? 'Selected Section' }} • 
+                            {{ $selectedClassName ?? 'Selected Class' }}
                         </p>
                     </div>
                 </div>
@@ -53,37 +55,24 @@
             <div class="space-y-4">
                 @forelse($students as $student)
                     <div wire:key="student-{{ $student->id }}" 
-                         x-data="{ 
-                            showGradeMenu: false,
-                            highlight: false,
-                            init() {
-                                Livewire.on('marks-updated', () => {
-                                    if (this.$el.querySelector('[data-mark-updated]')) {
-                                        this.highlight = true;
-                                        setTimeout(() => this.highlight = false, 2000);
-                                    }
-                                });
-                            }
-                         }"
-                         x-init="init()"
-                         :class="{ 'ring-2 ring-green-500 ring-offset-2': highlight }"
-                         class="bg-white rounded-lg border {{ $student->is_enrolled ? 'border-green-200' : 'border-red-200' }} p-4 relative hover:shadow-md transition-all duration-200">
+                         class="bg-white rounded-lg border {{ $student->is_enrolled ? 'border-green-200' : 'border-red-200' }} p-4 relative hover:shadow-md transition-all duration-200"
+                         :class="{ 'ring-2 ring-green-500 ring-offset-2': editing === {{ $student->id }} || showGradeMenu === {{ $student->id }} }">
                         <div class="flex items-center justify-between">
                             {{-- Student Info --}}
                             <div class="flex items-center space-x-4">
                                 <div class="flex-shrink-0">
                                     <div class="w-10 h-10 rounded-full {{ $student->is_enrolled ? 'bg-gray-100' : 'bg-red-50' }} flex items-center justify-center">
                                         <span class="text-sm font-medium {{ $student->is_enrolled ? 'text-gray-600' : 'text-red-600' }}">
-                                            {{ substr($student->first_name, 0, 1) }}{{ substr($student->last_name, 0, 1) }}
+                                            {{ substr($student->first_name ?? 'S', 0, 1) }}{{ substr($student->last_name ?? 'T', 0, 1) }}
                                         </span>
                                     </div>
                                 </div>
                                 <div>
                                     <h3 class="text-sm font-medium text-gray-900">
-                                        {{ $student->first_name }} {{ $student->middle_name }} {{ $student->last_name }}
+                                        {{ $student->first_name ?? '' }} {{ $student->middle_name ?? '' }} {{ $student->last_name ?? '' }}
                                     </h3>
                                     <div class="flex items-center mt-1 space-x-2">
-                                        <span class="text-xs text-gray-500">ADM: {{ $student->adm_no }}</span>
+                                        <span class="text-xs text-gray-500">ADM: {{ $student->adm_no ?? 'N/A' }}</span>
                                         <span class="text-xs px-1.5 py-0.5 rounded-full {{ $student->is_enrolled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
                                             {{ $student->is_enrolled ? 'Enrolled' : 'Not Enrolled' }}
                                         </span>
@@ -105,8 +94,7 @@
                                     {{-- Special Grade Display/Input --}}
                                     @if($specialGrade)
                                         <div class="flex items-center space-x-2" data-mark-updated>
-                                            <span @click="showGradeMenu = true" 
-                                                  class="cursor-pointer px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200
+                                            <span class="cursor-pointer px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200
                                                          {{ $specialGrade == 'AB' ? 'bg-red-100 text-red-800' : 
                                                             ($specialGrade == 'EX' ? 'bg-blue-100 text-blue-800' : 
                                                             ($specialGrade == 'P' ? 'bg-green-100 text-green-800' : 
@@ -122,8 +110,8 @@
                                         </div>
                                     @else
                                         {{-- Numeric Mark Input --}}
-                                        <div class="relative" x-data="{ editing: false }" data-mark-updated>
-                                            <div x-show="!editing" @click="editing = true" class="cursor-pointer">
+                                        <div class="relative" data-mark-updated>
+                                            <div @click="editing = {{ $student->id }}" class="cursor-pointer">
                                                 @if(isset($marks[$student->id]))
                                                     <span class="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium text-gray-900">
                                                         {{ $marks[$student->id] }}
@@ -135,10 +123,11 @@
                                                 @endif
                                             </div>
 
-                                            <div x-show="editing" 
+                                            {{-- Editing Mark Modal --}}
+                                            <div x-show="editing === {{ $student->id }}" 
                                                  x-cloak
-                                                 @click.away="editing = false"
-                                                 class="absolute right-0 top-0 z-10 bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-48">
+                                                 @click.away="editing = null"
+                                                 class="absolute right-0 top-0 z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-48">
                                                 <div class="space-y-4">
                                                     <div>
                                                         <label for="mark-{{ $student->id }}" class="block text-xs font-medium text-gray-700 mb-1">
@@ -150,15 +139,16 @@
                                                                min="0"
                                                                max="100"
                                                                class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                                                               placeholder="Enter mark">
+                                                               placeholder="Enter mark"
+                                                               x-init="$el.focus()">
                                                     </div>
                                                     <div class="flex justify-end space-x-2">
-                                                        <button @click="editing = false"
+                                                        <button @click="editing = null"
                                                                 class="inline-flex items-center px-2.5 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                                                             Cancel
                                                         </button>
                                                         <button wire:click="saveMark({{ $student->id }})"
-                                                                @click="editing = false"
+                                                                @click="editing = null"
                                                                 class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                                                             Save
                                                         </button>
@@ -168,7 +158,7 @@
                                         </div>
 
                                         {{-- Special Grade Button --}}
-                                        <button @click="showGradeMenu = true"
+                                        <button @click="showGradeMenu = {{ $student->id }}; editing = null"
                                                 class="inline-flex items-center px-2 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                                             <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
@@ -178,9 +168,9 @@
                                     @endif
 
                                     {{-- Special Grades Menu with improved transitions --}}
-                                    <div x-show="showGradeMenu" 
+                                    <div x-show="showGradeMenu === {{ $student->id }}" 
                                          x-cloak
-                                         @click.away="showGradeMenu = false"
+                                         @click.away="showGradeMenu = null"
                                          x-transition:enter="transition ease-out duration-200"
                                          x-transition:enter-start="opacity-0 transform scale-95"
                                          x-transition:enter-end="opacity-100 transform scale-100"
@@ -195,8 +185,8 @@
                                                      'P' => ['Pass', 'bg-green-50 text-green-900'],
                                                      'F' => ['Fail', 'bg-yellow-50 text-yellow-900']] as $code => $details)
                                                 <button wire:click="assignSpecialGrade('{{ $code }}', {{ $student->id }})"
-                                                        @click="showGradeMenu = false"
-                                                        class="w-full text-left px-4 py-2 text-sm hover:{{ explode(' ', $details[1])[0] }} {{ $specialGrade === $code ? $details[1] : 'text-gray-700' }} focus:outline-none">
+                                                        @click="showGradeMenu = null"
+                                                        class="w-full text-left px-4 py-2 text-sm hover:{{ explode(' ', $details[1])[0] }} {{ $specialGrades[$student->id] === $code ? $details[1] : 'text-gray-700' }} focus:outline-none">
                                                     <span class="font-medium">{{ $code }}</span>
                                                     <span class="ml-2 text-gray-500">{{ $details[0] }}</span>
                                                 </button>
@@ -248,27 +238,23 @@
             @endif
         </div>
     </div>
-
-    {{-- Success Message Toast with improved animations --}}
-    <div x-data="{ show: false, message: '' }"
-         @mark-saved.window="show = true; message = 'Mark saved successfully!'; setTimeout(() => show = false, 3000)"
-         x-show="show"
-         x-transition:enter="transform ease-out duration-300 transition"
-         x-transition:enter-start="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-         x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed bottom-0 right-0 mb-4 mr-4 max-w-sm w-full bg-green-50 border-l-4 border-green-400 p-4 shadow-lg">
-        <div class="flex items-center">
-            <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+@else
+    <div class="text-center py-12 bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+            <svg class="w-8 h-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900">Select a Stream</h3>
+        <p class="mt-1 text-md text-gray-500">Please select a stream to view students and assign marks.</p>
+        <div class="mt-6">
+            <button @click="currentStep--" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <svg class="mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-            </div>
-            <div class="ml-3">
-                <p class="text-sm text-green-800" x-text="message"></p>
-            </div>
+                Go Back to Stream Selection
+            </button>
         </div>
     </div>
 @endif 

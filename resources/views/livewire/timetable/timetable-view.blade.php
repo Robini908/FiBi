@@ -665,9 +665,30 @@
         </div>
     </div>
     
-    @include('livewire.timetable.partials.entry-modal')
-    @include('livewire.timetable.partials.bulk-assign-modal')
-    @include('livewire.timetable.partials.auto-generate-modal')
+    <!-- After the timetable content section -->
+    <div class="relative">
+        <!-- Main timetable content -->
+        <div class="transition-all duration-300 ease-in-out" :class="{ 'opacity-50 pointer-events-none': $wire.showAutoGenerateCard }">
+            <!-- Your existing timetable content here -->
+            @if($filteredPeriods->count() > 0)
+                <!-- ... existing timetable content ... -->
+            @else
+                <!-- ... existing empty state content ... -->
+            @endif
+        </div>
+
+        <!-- Auto-generate card overlay -->
+        @if($showAutoGenerateCard && $activeCard === 'auto-generate')
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity z-40"></div>
+            <div class="fixed inset-0 z-50 overflow-y-auto">
+                <div class="flex min-h-full items-center justify-center p-4">
+                    <div class="w-full max-w-5xl transform transition-all">
+                        @include('livewire.timetable.partials.auto-generate-card')
+                    </div>
+                </div>
+            </div>
+        @endif
+    </div>
     
     <!-- Debug element to show modal state -->
     <div class="text-xs text-gray-500 ml-2">

@@ -53,23 +53,6 @@ unset($__params);
 unset($__split);
 if (isset($__slots)) unset($__slots);
 ?>
-     <!-- Wire Elements Modal -->
-     <?php
-$__split = function ($name, $params = []) {
-    return [$name, $params];
-};
-[$__name, $__params] = $__split('wire-elements-modal');
-
-$__html = app('livewire')->mount($__name, $__params, 'lw-2903691910-1', $__slots ?? [], get_defined_vars());
-
-echo $__html;
-
-unset($__html);
-unset($__name);
-unset($__params);
-unset($__split);
-if (isset($__slots)) unset($__slots);
-?>
     
 
     <div class="min-h-full">
@@ -180,7 +163,7 @@ if (isset($__slots)) unset($__slots);
 <?php endif; ?>
 
 
-    <?php echo view('components.toast-scripts')->render(); ?>
+   
     <?php echo $__env->yieldPushContent('scripts'); ?>
 </body>
 </html>

@@ -403,7 +403,7 @@ class AttendanceController extends Controller
         // Get all students in the class/section
         $students = StudentRecord::where('my_class_id', $request->class_id)
             ->where('section_id', $request->section_id)
-            ->orderBy('name')
+            ->orderBy('first_name')
             ->get();
             
         // Get all attendance records in the date range

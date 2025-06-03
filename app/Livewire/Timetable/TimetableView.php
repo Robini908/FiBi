@@ -9,8 +9,6 @@ use App\Models\Subject;
 use App\Models\TimetablePeriod;
 use App\Models\TimetableSchedule;
 use App\Models\TeacherSubjectAssignment;
-use App\Models\TimetableRecord;
-use App\Models\TimetableEntry;
 use App\User;
 use Livewire\Component;
 use Usernotnull\Toast\Concerns\WireToast;
@@ -19,7 +17,6 @@ use App\Livewire\Timetable\AutoGenerateService;
 use App\Models\SubjectCategory;
 use Illuminate\Support\Facades\Log;
 use App\Models\Setting;
-use Usernotnull\Toast\Toast;
 
 class TimetableView extends Component
 {
@@ -31,27 +28,30 @@ class TimetableView extends Component
     // Models
     public ?int $timetableRecordId = null;
     public ?int $sectionId = null;
-    
+    public ?SchoolTimetable $timetable = null;
+    public ?Section $section = null;
+
     // Computed Collections - these will be implemented as methods
     // instead of direct properties to avoid the getMorphClass error
-    
+
     // UI State
     public string $activeDay;
     public array $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
     public array $timetableMatrix = [];
     public bool $showWeekendDays = false;
     public bool $showFilters = false;
-    
+
     // Filters
     public $filterSubject = null;
     public $filterTeacher = null;
     public $filterDay = null;
-    
+
     // Modal State
     public bool $showEntryModal = false;
     public bool $showBulkAssignModal = false;
     public bool $showAutoGenerateModal = false;
-    
+    public bool $loading = false;
+
     // Form Data for entry modal
     public $entryForm = [
         'id' => null,
@@ -63,7 +63,7 @@ class TimetableView extends Component
         'weekday' => null,
         'notes' => null,
     ];
-    
+
     // Form Data for bulk assign modal
     public $bulkAssignForm = [
         'days' => [],
@@ -73,7 +73,7 @@ class TimetableView extends Component
         'classroom' => null,
         'notes' => null,
     ];
-    
+
     // Form Data for auto-generate modal
     public $autoGenerateForm = [
         'days' => [],
@@ -94,27 +94,31 @@ class TimetableView extends Component
             'afternoon_end' => 960 // 4:00 PM in minutes from midnight
         ],
     ];
-    
+
     // Other state variables
     protected $listeners = [
         'refreshTimetable' => 'refreshTimetable',
         'entryAdded' => '$refresh',
         'current-periods-updated' => '$refresh'
     ];
-    
+
+    // Add new properties for card-based interface
+    public $activeCard = null;
+    public $showAutoGenerateCard = false;
+
     /**
      * Get the timetable model instance
-     * 
+     *
      * @return \App\Models\SchoolTimetable|null
      */
     public function getTimetableProperty()
     {
         return SchoolTimetable::with('myClass')->find($this->timetableRecordId);
     }
-    
+
     /**
      * Get the section model instance
-     * 
+     *
      * @return \App\Models\Section|null
      */
     public function getSectionProperty()
@@ -122,23 +126,23 @@ class TimetableView extends Component
         if (!$this->sectionId) {
             return null;
         }
-        
+
         return Section::find($this->sectionId);
     }
-    
+
     /**
      * Get the periods collection
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getPeriodsProperty()
     {
         return $this->getFilteredPeriods();
     }
-    
+
     /**
      * Get the schedules collection
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getSchedulesProperty()
@@ -146,42 +150,30 @@ class TimetableView extends Component
         if (!$this->timetableRecordId) {
             return collect();
         }
-        
+
         $query = TimetableSchedule::with(['teacher', 'subject'])
             ->where('timetable_id', $this->timetableRecordId);
-            
+
         if ($this->filterSubject) {
             $query->where('subject_id', $this->filterSubject);
         }
-        
+
         if ($this->filterTeacher) {
             $query->where('teacher_id', $this->filterTeacher);
         }
-        
+
         if ($this->filterDay) {
             $query->where('weekday', $this->filterDay);
         }
-            
+
         return $query->get();
     }
-    
-    /**
-     * Get periods categorized by type
-     * 
-     * @return \Illuminate\Support\Collection
-     */
-    public function getCategorizedPeriodsProperty()
-    {
-        if (empty($this->getPeriodsProperty())) {
-            return collect();
-        }
-        
-        return $this->getPeriodsProperty()->groupBy('period_type');
-    }
-    
+
+    // getCategorizedPeriodsProperty() is defined below with more detailed implementation
+
     /**
      * Get all subjects for the dropdown
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getSubjectsProperty()
@@ -189,46 +181,23 @@ class TimetableView extends Component
         if (!$this->timetable) {
             return collect();
         }
-        
+
         $classId = $this->timetable->class_id;
         return $this->getSubjectsForClass($classId, $this->sectionId);
     }
-    
-    /**
-     * Get all teachers for the dropdown
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getTeachersProperty()
-    {
-        return User::role('teacher')->orderBy('name')->get();
-    }
-    
-    // Model instances
-    public ?SchoolTimetable $timetable = null;
-    public ?Section $section = null;
-    
-    // Collections
-    /** @var \Illuminate\Support\Collection */
-    public $periods;
-    /** @var \Illuminate\Support\Collection */
-    public $schedules;
-    /** @var \Illuminate\Support\Collection */
-    public $categorizedPeriods;
-    
-    // Arrays
+
+    // getTeachersProperty() is defined below with more detailed implementation
+
+    // Additional properties
     public $selectedDay;
     public $selectedPeriodId;
-    
-    public $subjects = [];
-    public $teachers = [];
-    
+
     protected $rules = [
         'entryForm.subject_id' => 'required|exists:subjects,id',
         'entryForm.teacher_id' => 'nullable|exists:users,id',
         'entryForm.classroom' => 'nullable|string|max:50',
         'entryForm.notes' => 'nullable|string',
-        
+
         // Bulk assignment rules
         'bulkAssignForm.days' => 'required|array|min:1',
         'bulkAssignForm.period_ids' => 'required|array|min:1',
@@ -242,36 +211,36 @@ class TimetableView extends Component
         $this->timetableRecordId = $timetableRecordId;
         $this->sectionId = $sectionId;
         $this->activeDay = strtolower(date('l')); // Default to current day
-        
+
         // Enhanced logging for debugging
         \Log::debug("Mounted TimetableView with parameters: timetableId={$timetableRecordId}, sectionId={$sectionId}");
-        
+
         // Validate the timetable ID early
         if (empty($this->timetableRecordId)) {
             \Log::error("TimetableView mounted with empty timetableRecordId");
             toast()->danger('Error: Invalid timetable ID')->push();
         }
-        
+
         // Set the timetable property
         $this->timetable = $this->getTimetableProperty();
         $this->section = $this->getSectionProperty();
-        
+
         // Initialize the timetable matrix
         $this->buildTimetableMatrix();
-        
+
         // Check if we have weekend slots and should show weekend days
         $this->checkWeekendSlots();
-        
+
         if ($this->timetable) {
             \Log::debug("Timetable loaded successfully: {$this->timetable->id}");
         } else {
             \Log::warning("Failed to load timetable with ID: {$timetableRecordId}");
         }
     }
-    
+
     /**
      * Get filtered periods
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getFilteredPeriods()
@@ -279,80 +248,76 @@ class TimetableView extends Component
         if (!$this->timetableRecordId) {
             return collect();
         }
-        
+
         return TimetablePeriod::where('timetable_id', $this->timetableRecordId)
             ->orderBy('start_time', 'asc')
             ->orderBy('period_order', 'asc')
             ->get();
     }
-    
+
     /**
      * Check if there are weekend entries in the schedule
      */
     public function checkWeekendSlots()
     {
         $schedules = $this->getSchedulesProperty();
-        
+
         // If no schedules loaded, return early
         if ($schedules->isEmpty()) {
             $this->showWeekendDays = false;
             return;
         }
-        
+
         // Check if there are periods scheduled for weekend days
-        $weekendEntries = $schedules->filter(function ($entry) {
-            return in_array($entry->weekday, ['saturday', 'sunday']);
-        });
-        
+        $weekendEntries = $schedules->filter(fn ($entry) => in_array($entry->weekday, ['saturday', 'sunday']));
+
         $this->showWeekendDays = $weekendEntries->count() > 0;
-        
+
         // Update days array to include weekends if needed
         if ($this->showWeekendDays && count($this->days) === 5) {
             $this->days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         }
     }
-    
+
     /**
      * Build the timetable matrix
      */
     public function buildTimetableMatrix()
     {
         $this->timetableMatrix = [];
-        
+
         // If no timetable is loaded, return early
         if (!$this->timetableRecordId) {
             return;
         }
-        
+
         $periods = $this->getPeriodsProperty();
         $schedules = $this->getSchedulesProperty();
-        
+
         foreach ($this->days as $day) {
             $this->timetableMatrix[$day] = [];
-            
+
             foreach ($periods as $period) {
                 // Find entry for this day and period
-                $entry = $schedules->first(function ($entry) use ($day, $period) {
-                    return $entry->weekday === $day && $entry->period_id === $period->id;
-                });
-                
+                $entry = $schedules->first(fn ($entry) => $entry->weekday === $day && $entry->period_id === $period->id);
+
                 $this->timetableMatrix[$day][$period->id] = $entry;
             }
         }
     }
-    
+
     public function loadTimetableData()
     {
         try {
             // Load the timetable record as a single model instance, not a collection
         $this->timetable = SchoolTimetable::with('myClass')->find($this->timetableRecordId);
-        
+
         if (!$this->timetable) {
             toast()->danger('Timetable not found. Please select a valid timetable.')->push();
             $this->redirect(route('timetable.list'));
             return;
         }
-        
+
         // Allow section to be null if not required
         if ($this->sectionId) {
                 // Ensure we're loading a single section model, not a collection
@@ -364,171 +329,79 @@ class TimetableView extends Component
                 // Make sure section is null, not an empty collection
                 $this->section = null;
         }
-        
-        // Get periods in order by start time for better chronological display
-            $periods = TimetablePeriod::where('timetable_id', $this->timetableRecordId)
-            ->orderBy('start_time', 'asc')  // Primary sort by start_time
-            ->orderBy('period_order', 'asc') // Secondary sort by period_order
-            ->get();
-        
-            // Ensure periods is always initialized as a collection
-            $this->periods = $periods instanceof Collection ? $periods : collect($periods);
-        
-        // Group periods by type for better organization
-        $this->categorizedPeriods = $this->periods->groupBy(function($period) {
-            $name = strtolower($period->period_name);
-            
-            if (str_contains($name, 'break') || str_contains($name, 'lunch') || str_contains($name, 'recess')) {
-                return 'breaks';
-            } elseif (str_contains($name, 'assembly') || str_contains($name, 'homeroom')) {
-                return 'assembly';
-            } elseif (str_contains($name, 'prep') || str_contains($name, 'study')) {
-                return 'prep';
-            } elseif (str_contains($name, 'saturday') || str_contains($name, 'sunday') || str_contains($name, 'weekend')) {
-                return 'weekend';
-            } else {
-                return 'lessons';
-            }
-        });
-        
-        // Get all schedule entries for this timetable
-            $schedules = TimetableSchedule::where('timetable_id', $this->timetableRecordId)
-            ->with(['subject', 'teacher', 'period'])
-            ->get();
-        
-            // Ensure schedules is always initialized as a collection
-            $this->schedules = $schedules instanceof Collection ? $schedules : collect($schedules);
-        
+
+        // We'll use getPeriodsProperty() to get the periods
+
         // Build the timetable matrix
         $this->buildTimetableMatrix();
-        
+
         // Preload subjects and teachers for dropdowns
         $this->loadDropdownData();
-            
+
         } catch (\Exception $e) {
             // Log the error and provide user feedback
             \Log::error('Error loading timetable data: ' . $e->getMessage());
             toast()->danger('Error loading timetable data: ' . $e->getMessage())->push();
-            
-            // Initialize empty collections for safety
-            $this->periods = collect();
-            $this->schedules = collect();
-            $this->categorizedPeriods = collect();
+
+            // Initialize empty matrix for safety
             $this->timetableMatrix = [];
         }
     }
-    
+
     public function loadDropdownData()
     {
-        // Load all subjects ordered by name
-        $this->subjects = Subject::orderBy('subject_name')->get();
+        // We don't need to store subjects and teachers as properties anymore
+        // We'll use getSubjectsProperty() and getTeachersProperty() instead
+        // This method is kept for backward compatibility
+    }
 
-        // Initialize teachers collection
-        $teachers = collect();
-        
-        // 1. First try to get teachers from the section if available
-        if ($this->section) {
-            // Get the section's teacher if assigned
-            if ($this->section->teacher_id) {
-                $sectionTeacher = User::find($this->section->teacher_id);
-                if ($sectionTeacher) {
-                    $teachers->push($sectionTeacher);
-                    \Log::debug("Added section teacher: {$sectionTeacher->name}");
-                }
-            }
-            
-            // Get teachers associated with the class for this section
-            if ($this->section->my_class) {
-                $classTeachers = $this->section->my_class->teachers()->get();
-                if ($classTeachers && $classTeachers->count() > 0) {
-                    // Add without duplicates
-                    $classTeachers->each(function($teacher) use ($teachers) {
-                        if (!$teachers->contains('id', $teacher->id)) {
-                            $teachers->push($teacher);
-                            \Log::debug("Added class teacher: {$teacher->name}");
-                        }
-                    });
-                }
-            }
-        }
-        
-        // 2. If we have a timetable with class_id, get teachers for that class
-        if ($teachers->isEmpty() && $this->timetable && $this->timetable->class_id) {
-            $class = MyClass::find($this->timetable->class_id);
-            if ($class) {
-                $classTeachers = $class->teachers()->get();
-                if ($classTeachers && $classTeachers->count() > 0) {
-                    $teachers = $classTeachers;
-                    \Log::debug("Added {$classTeachers->count()} teachers from timetable class");
-                }
-            }
-        }
-        
-        // 3. If still no teachers, get all teachers
-        if ($teachers->isEmpty()) {
-            // Use Spatie's role method to get teachers 
-            $teachers = User::role('teacher')
-            ->orderBy('name')
-            ->get();
-            \Log::debug("No teachers found in section/class, found {$teachers->count()} teachers total");
-        }
-        
-        // Set the teachers collection
-        $this->teachers = $teachers;
-        
-        // Ensure subjects is a collection
-        if (!($this->subjects instanceof \Illuminate\Support\Collection)) {
-            $this->subjects = collect($this->subjects);
-        }
-        
-        // Ensure teachers is a collection
-        if (!($this->teachers instanceof \Illuminate\Support\Collection)) {
-            $this->teachers = collect($this->teachers);
-        }
-        
+    /**
+     * Get default classroom name based on section and class
+     */
+    private function getDefaultClassroom()
+    {
         // Get classroom information from section or timetable if available
         if ($this->section) {
-            // Set default classroom based on section information
-            if (empty($this->entryForm['classroom']) && isset($this->section->name)) {
-                $className = optional($this->section->my_class)->name ?? '';
-                $sectionName = $this->section->name;
-                
-                // Format: Class Name - Section Name (e.g., "Form 2 - A")
-                if ($className && $sectionName) {
-                    $this->entryForm['classroom'] = "$className - $sectionName";
-                }
+            $className = optional($this->section->my_class)->name ?? '';
+            $sectionName = $this->section->name;
+
+            // Format: Class Name - Section Name (e.g., "Form 2 - A")
+            if ($className && $sectionName) {
+                return "$className - $sectionName";
             }
-        } elseif ($this->timetable && empty($this->entryForm['classroom'])) {
+        } elseif ($this->timetable) {
             // If no section but timetable has class, use class name
             $className = optional($this->timetable->myClass)->name ?? '';
             if ($className) {
-                $this->entryForm['classroom'] = $className;
+                return $className;
             }
         }
+
+        return '';
     }
-    
+
     public function setActiveDay($day)
     {
         $this->activeDay = $day;
     }
-    
+
     public function toggleWeekendDays()
     {
         $this->showWeekendDays = !$this->showWeekendDays;
     }
-    
+
     public function toggleFilters()
     {
         $this->showFilters = !$this->showFilters;
     }
-    
+
     public function resetFilters()
     {
         $this->filterSubject = '';
         $this->filterTeacher = '';
         $this->filterDay = '';
     }
-    
+
     public function getVisibleDays()
     {
         if (!$this->showWeekendDays) {
@@ -536,10 +409,10 @@ class TimetableView extends Component
         }
         return $this->days; // All days including weekends
     }
-    
+
     /**
      * Determine if a period allows class assignment
-     * 
+     *
      * @param mixed $period
      * @return bool
      */
@@ -548,10 +421,10 @@ class TimetableView extends Component
         if (!$period) {
             return false;
         }
-        
+
         // Get period name (handle both object and array)
         $periodName = '';
-        
+
         if (is_object($period) && isset($period->period_name)) {
             $periodName = strtolower($period->period_name);
         } elseif (is_array($period) && isset($period['period_name'])) {
@@ -559,67 +432,65 @@ class TimetableView extends Component
         } elseif (is_array($period) && isset($period['attributes']['period_name'])) {
             $periodName = strtolower($period['attributes']['period_name']);
         }
-        
+
         if (empty($periodName)) {
             return false;
         }
-        
+
         // Define period types that should NOT allow class assignment
         $nonAssignableTypes = [
-            'break', 'lunch', 'movement', 'recess', 
+            'break', 'lunch', 'movement', 'recess',
             'assembly', 'short break', 'lunch break',
             'transition', 'movement time', 'curriculum'
         ];
-        
+
         // Check for any non-assignable keywords in the period name
         foreach ($nonAssignableTypes as $type) {
             if (str_contains($periodName, $type)) {
                 return false;
             }
         }
-        
+
         // Periods, Preps, Weekend classes, and other lessons should be assignable
         $assignableTypes = [
             'period', 'class', 'lesson', 'prep', 'saturday', 'sunday', 'weekend'
         ];
-        
+
         foreach ($assignableTypes as $type) {
             if (str_contains($periodName, $type)) {
                 return true;
             }
         }
-        
+
         // By default, if not explicitly recognized, allow assignment
         return true;
     }
-    
+
     public function openEntryModal($day, $periodId)
     {
         $this->selectedDay = $day;
         $this->selectedPeriodId = $periodId;
-        
+
         // Find the period in the collection
         $periods = $this->getPeriodsProperty();
         $period = $periods->firstWhere('id', $periodId);
-        
+
         // Check if period exists
         if (!$period) {
             toast()->danger('Period not found.')->push();
             return;
         }
-        
+
         // Check if this period allows class assignment
         if (!$this->canAssignClass($period)) {
             toast()->warning("Cannot assign classes to '{$period->period_name}' periods.")->push();
             return;
         }
-        
+
         // Check if an entry already exists
         $schedules = $this->getSchedulesProperty();
-        $existingEntry = $schedules->first(function ($entry) use ($day, $periodId) {
-            return $entry->weekday === $day && $entry->period_id === $periodId;
-        });
-        
+        $existingEntry = $schedules->first(fn ($entry) => $entry->weekday === $day && $entry->period_id === $periodId);
+
         if ($existingEntry) {
             $this->entryForm = [
                 'id' => $existingEntry->id,
@@ -631,19 +502,12 @@ class TimetableView extends Component
                 'classroom' => $existingEntry->classroom,
                 'notes' => $existingEntry->notes,
             ];
-            
+
             toast()->info('Editing existing timetable entry for ' . ucfirst($day))->push();
         } else {
-            // Default classroom from section
-            $defaultClassroom = '';
-            if ($this->section) {
-                $className = optional($this->section->my_class)->name ?? '';
-                $sectionName = $this->section->name ?? '';
-                if ($className && $sectionName) {
-                    $defaultClassroom = "$className - $sectionName";
-                }
-            }
-            
+            // Get default classroom name
+            $defaultClassroom = $this->getDefaultClassroom();
+
             $this->entryForm = [
                 'id' => null,
                 'timetable_id' => $this->timetableRecordId,
@@ -654,42 +518,31 @@ class TimetableView extends Component
                 'classroom' => $defaultClassroom,
                 'notes' => '',
             ];
-            
+
             toast()->info('Adding new timetable entry for ' . ucfirst($day))->push();
         }
-        
+
         $this->showEntryModal = true;
     }
-    
+
     /**
      * Get only the periods that can have classes assigned to them
-     * 
+     *
      * @return \Illuminate\Support\Collection
      */
     public function getAssignablePeriods()
     {
-        // Ensure we're working with a collection
-        if (!($this->periods instanceof \Illuminate\Support\Collection)) {
-            $this->periods = collect($this->periods);
-        }
-        
-        return $this->periods->filter(function ($period) {
-            return $this->canAssignClass($period);
-        });
+        // Get periods from the property getter
+        $periods = $this->getPeriodsProperty();
+
+        return $periods->filter(fn ($period) => $this->canAssignClass($period));
     }
-    
+
     public function openBulkAssignModal()
     {
-        // Default classroom based on section information
-        $defaultClassroom = '';
-        if ($this->section) {
-            $className = optional($this->section->my_class)->name ?? '';
-            $sectionName = $this->section->name ?? '';
-            if ($className && $sectionName) {
-                $defaultClassroom = "$className - $sectionName";
-            }
-        }
-        
+        // Get default classroom name
+        $defaultClassroom = $this->getDefaultClassroom();
+
         // Reset the bulk assign form
         $this->bulkAssignForm = [
             'days' => [],
@@ -699,17 +552,17 @@ class TimetableView extends Component
             'classroom' => $defaultClassroom,
             'notes' => null,
         ];
-        
+
         // Check if there are any assignable periods
         $assignablePeriods = $this->getAssignablePeriodsProperty();
         if ($assignablePeriods->isEmpty()) {
             toast()->warning('No assignable periods found. Please create some teaching periods first.')->push();
             return;
         }
-        
+
         $this->showBulkAssignModal = true;
     }
-    
+
     public function saveEntry()
     {
         $this->validate([
@@ -718,7 +571,7 @@ class TimetableView extends Component
             'entryForm.classroom' => 'nullable|string|max:50',
             'entryForm.notes' => 'nullable|string',
         ]);
-        
+
         try {
             $data = [
                 'timetable_id' => $this->timetableRecordId,
@@ -731,26 +584,26 @@ class TimetableView extends Component
                 'is_recurring' => true,
                 'specific_date' => null,
             ];
-            
+
             if ($this->entryForm['id']) {
                 $entry = TimetableSchedule::findOrFail($this->entryForm['id']);
                 $entry->update($data);
-                
+
                 toast()->success('Timetable entry updated successfully')->push();
             } else {
                 TimetableSchedule::create($data);
-                
+
                 toast()->success('Timetable entry created successfully')->push();
             }
-            
+
             $this->closeEntryModal();
             $this->refreshTimetable();
-            
+
         } catch (\Exception $e) {
             toast()->danger('Error: ' . $e->getMessage())->push();
         }
     }
-    
+
     public function saveBulkAssign()
     {
         $this->validate([
@@ -760,16 +613,16 @@ class TimetableView extends Component
             'bulkAssignForm.teacher_id' => 'nullable|exists:users,id',
             'bulkAssignForm.classroom' => 'nullable|string|max:50',
         ]);
-        
+
         try {
             $created = 0;
             $updated = 0;
             $errors = 0;
             $skipped = 0;
-            
+
             // Get assignable periods
             $assignablePeriods = $this->getAssignablePeriodsProperty();
-            
+
             foreach ($this->bulkAssignForm['days'] as $day) {
                 foreach ($this->bulkAssignForm['period_ids'] as $periodId) {
                     // Skip if period is not assignable
@@ -777,14 +630,14 @@ class TimetableView extends Component
                         $skipped++;
                         continue;
                     }
-                    
+
                     // Check if entry already exists
                     $existingEntry = TimetableSchedule::where([
                         'timetable_id' => $this->timetableRecordId,
                         'period_id' => $periodId,
                         'weekday' => $day,
                     ])->first();
-                    
+
                     $data = [
                         'timetable_id' => $this->timetableRecordId,
                         'period_id' => $periodId,
@@ -796,7 +649,7 @@ class TimetableView extends Component
                         'is_recurring' => true,
                         'specific_date' => null,
                     ];
-                    
+
                     if ($existingEntry) {
                         try {
                             $existingEntry->update($data);
@@ -814,7 +667,7 @@ class TimetableView extends Component
                     }
                 }
             }
-            
+
             $message = "Bulk assignment complete: {$created} created, {$updated} updated";
             if ($skipped > 0) {
                 $message .= ", {$skipped} skipped (non-assignable periods)";
@@ -825,41 +678,41 @@ class TimetableView extends Component
             } else {
                 toast()->success($message)->push();
             }
-            
+
             $this->closeBulkAssignModal();
             $this->refreshTimetable();
-            
+
         } catch (\Exception $e) {
             toast()->danger('Error: ' . $e->getMessage())->push();
         }
     }
-    
+
     public function deleteEntry($entryId = null)
     {
         $id = $entryId ?? $this->entryForm['id'];
-        
+
         if (!$id) {
             $this->closeEntryModal();
             return;
         }
-        
+
         try {
             TimetableSchedule::findOrFail($id)->delete();
             toast()->success('Timetable entry deleted successfully')->push();
-            
+
             $this->closeEntryModal();
             $this->loadTimetableData();
-            
+
         } catch (\Exception $e) {
             toast()->danger('Error: ' . $e->getMessage())->push();
         }
     }
-    
+
     public function copyEntry($entryId)
     {
         try {
             $entry = TimetableSchedule::findOrFail($entryId);
-            
+
             // Open the entry form with copied data but no ID (treat as new)
             $this->entryForm = [
                 'id' => null, // New entry
@@ -871,18 +724,18 @@ class TimetableView extends Component
                 'classroom' => $entry->classroom,
                 'notes' => $entry->notes,
             ];
-            
+
             $this->selectedDay = $entry->weekday;
             $this->selectedPeriodId = $entry->period_id;
-            
+
             toast()->info('Copied entry. Please select a new slot to paste')->push();
             $this->showEntryModal = true;
-            
+
         } catch (\Exception $e) {
             toast()->danger('Error: ' . $e->getMessage())->push();
         }
     }
-    
+
     public function closeEntryModal()
     {
         $this->showEntryModal = false;
@@ -899,7 +752,7 @@ class TimetableView extends Component
             'notes' => '',
         ];
     }
-    
+
     public function closeBulkAssignModal()
     {
         $this->showBulkAssignModal = false;
@@ -912,35 +765,31 @@ class TimetableView extends Component
             'notes' => null,
         ];
     }
-    
+
     /**
      * Get all assignable periods
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getAssignablePeriodsProperty()
     {
-        $periods = $this->getPeriodsProperty();
-        
-        return $periods->filter(function ($period) {
-            return $this->canAssignClass($period);
-        });
+        return $this->getAssignablePeriods();
     }
-    
+
     public function render()
     {
         // Debug timetable property
         $timetable = $this->getTimetableProperty();
         \Log::debug("In render - Timetable ID: " . ($timetable ? $timetable->id : 'null'));
-        
+
         // Apply any filters and rebuild the timetable matrix
         if ($this->filterSubject || $this->filterTeacher || $this->filterDay) {
             $this->buildTimetableMatrix();
         }
-        
+
         // Set the timetable property using getter
         $this->timetable = $this->getTimetableProperty();
-        
+
         return view('livewire.timetable.timetable-view', [
             'filteredPeriods' => $this->getPeriodsProperty(),
             'visibleDays' => $this->getVisibleDays(),
@@ -952,7 +801,94 @@ class TimetableView extends Component
             'teachers' => $this->getTeachersProperty(),
         ]);
     }
-    
+
+    // getPeriodsProperty() is already defined above
+
+    // getSchedulesProperty() is already defined above
+
+    /**
+     * Get categorized periods property
+     */
+    public function getCategorizedPeriodsProperty()
+    {
+        $periods = $this->getPeriodsProperty();
+
+        // Group periods by type for better organization
+        return $periods->groupBy(function($period) {
+            $name = strtolower($period->period_name);
+
+            if (str_contains($name, 'break') || str_contains($name, 'lunch') || str_contains($name, 'recess')) {
+                return 'breaks';
+            } elseif (str_contains($name, 'assembly') || str_contains($name, 'homeroom')) {
+                return 'assembly';
+            } elseif (str_contains($name, 'prep') || str_contains($name, 'study')) {
+                return 'prep';
+            } elseif (str_contains($name, 'saturday') || str_contains($name, 'sunday') || str_contains($name, 'weekend')) {
+                return 'weekend';
+            } else {
+                return 'lessons';
+            }
+        });
+    }
+
+    // getSubjectsProperty() is already defined above
+
+    /**
+     * Get teachers property
+     */
+    public function getTeachersProperty()
+    {
+        // Initialize teachers collection
+        $teachers = collect();
+
+        // 1. First try to get teachers from the section if available
+        if ($this->section) {
+            // Get the section's teacher if assigned
+            if ($this->section->teacher_id) {
+                $sectionTeacher = User::find($this->section->teacher_id);
+                if ($sectionTeacher) {
+                    $teachers->push($sectionTeacher);
+                }
+            }
+
+            // Get teachers associated with the class for this section
+            if ($this->section->my_class) {
+                $classTeachers = $this->section->my_class->teachers()->get();
+                if ($classTeachers && $classTeachers->count() > 0) {
+                    // Add without duplicates
+                    $classTeachers->each(function($teacher) use ($teachers) {
+                        if (!$teachers->contains('id', $teacher->id)) {
+                            $teachers->push($teacher);
+                        }
+                    });
+                }
+            }
+        }
+
+        // 2. If we have a timetable with class_id, get teachers for that class
+        if ($teachers->isEmpty() && $this->timetable && $this->timetable->class_id) {
+            $class = MyClass::find($this->timetable->class_id);
+            if ($class) {
+                $classTeachers = $class->teachers()->get();
+                if ($classTeachers && $classTeachers->count() > 0) {
+                    $teachers = $classTeachers;
+                }
+            }
+        }
+
+        // 3. If still no teachers, get all teachers
+        if ($teachers->isEmpty()) {
+            // Use Spatie's role method to get teachers
+            $teachers = User::role('teacher')
+            ->orderBy('name')
+            ->get();
+        }
+
+        return $teachers;
+    }
+
+    // getAssignablePeriodsProperty() is already defined above
+
     /**
      * Switch to a different tab in the timetable interface
      */
@@ -960,7 +896,7 @@ class TimetableView extends Component
     {
         $this->dispatch('switchTab', $tab);
     }
-    
+
     /**
      * Get the currently selected subject name
      */
@@ -969,16 +905,16 @@ class TimetableView extends Component
         if (empty($this->entryForm['subject_id'])) {
             return '';
         }
-        
+
         // Convert to collection if needed
         $subjectsCollection = collect($this->subjects);
-        
+
         // Find the subject with the matching ID
         $subject = $subjectsCollection->firstWhere('id', $this->entryForm['subject_id']);
-        
+
         return optional($subject)->subject_name ?? '';
     }
-    
+
     /**
      * Get the currently selected teacher name
      */
@@ -987,28 +923,29 @@ class TimetableView extends Component
         if (empty($this->entryForm['teacher_id'])) {
             return '';
         }
-        
+
         // Convert to collection if needed
         $teachersCollection = collect($this->teachers);
-        
+
         // Find the teacher with the matching ID
         $teacher = $teachersCollection->firstWhere('id', $this->entryForm['teacher_id']);
-        
+
         return optional($teacher)->name ?? '';
     }
-    
+
     /**
-     * Open the auto-generate modal and initialize its form data
+     * Open the auto-generate card and initialize its form data
      */
     public function openAutoGenerateModal()
     {
-        // First, immediately show the modal with default settings
-        $this->showAutoGenerateModal = true;
-        
+        // Switch to auto-generate card view
+        $this->activeCard = 'auto-generate';
+        $this->showAutoGenerateCard = true;
+
         // Check for existing entries before initializing the form
         $existingEntries = TimetableSchedule::where('timetable_id', $this->timetableRecordId)->count();
         $hasExistingEntries = $existingEntries > 0;
-        
+
         // Initialize with basic defaults immediately
         $this->autoGenerateForm = [
             'days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
@@ -1016,8 +953,8 @@ class TimetableView extends Component
             'avoid_consecutive_subjects' => true,
             'prioritize_primary_teachers' => true,
             'balance_teacher_workload' => true,
-            'clear_existing' => !$hasExistingEntries, // Set to true only if no existing entries
-            'respect_existing_entries' => $hasExistingEntries, // Set to true if existing entries
+            'clear_existing' => !$hasExistingEntries,
+            'respect_existing_entries' => $hasExistingEntries,
             'enable_subject_time_preferences' => true,
             'ensure_daily_category_variety' => true,
             'enable_balanced_distribution' => true,
@@ -1029,25 +966,35 @@ class TimetableView extends Component
                 'Science' => 1
             ],
             'time_preferences' => [
-                'morning_end' => 600,  // 10:00 AM in minutes from midnight
-                'midday_end' => 780,   // 1:00 PM in minutes from midnight
-                'afternoon_end' => 960 // 4:00 PM in minutes from midnight
+                'morning_end' => 600,
+                'midday_end' => 780,
+                'afternoon_end' => 960
             ],
         ];
-        
-        // Set fallback subject preferences immediately so there's initial data while loading
+
+        // Set fallback subject preferences
         $this->autoGenerateForm['subject_preferences'] = $this->getPreloadedSubjectPreferences();
-        
-        // Log information about existing entries for debugging
-        \Log::info("Auto-generate modal opened with {$existingEntries} existing entries. Settings: clear_existing=" . 
-                 ($this->autoGenerateForm['clear_existing'] ? 'true' : 'false') . 
-                 ", respect_existing_entries=" . 
+
+        // Log information about existing entries
+        \Log::info("Auto-generate card opened with {$existingEntries} existing entries. Settings: clear_existing=" .
+                 ($this->autoGenerateForm['clear_existing'] ? 'true' : 'false') .
+                 ", respect_existing_entries=" .
                  ($this->autoGenerateForm['respect_existing_entries'] ? 'true' : 'false'));
-        
-        // Load assignment data in the background
+
+        // Load assignment data
         $this->loadTeacherSubjectAssignments();
     }
-    
+
+    /**
+     * Close the auto-generate card
+     */
+    public function closeAutoGenerateModal()
+    {
+        $this->activeCard = null;
+        $this->showAutoGenerateCard = false;
+        $this->resetValidation();
+    }
+
     /**
      * Loads teacher subject assignments without blocking the UI
      * This is called after the modal is displayed to prevent flashing
@@ -1057,17 +1004,17 @@ class TimetableView extends Component
         try {
             // Get the current timetable record
             $timetableRecord = SchoolTimetable::find($this->timetableRecordId);
-            
+
             if (!$timetableRecord) {
                 Log::warning('Timetable record not found when trying to load assignments');
                 return;
             }
-            
+
             $classId = $timetableRecord->class_id;
             $sectionId = $this->sectionId;
             $academicSession = $timetableRecord->academic_session;
             $academicTerm = $timetableRecord->academic_term;
-            
+
             // Log key details for debugging
             Log::info("Loading teacher subject assignments for timetable auto-generation", [
                 'timetable_id' => $this->timetableRecordId,
@@ -1076,12 +1023,12 @@ class TimetableView extends Component
                 'academic_session' => $academicSession,
                 'academic_term' => $academicTerm
             ]);
-            
+
             // Get teacher subject assignments for this class/section with eager loading
             $query = TeacherSubjectAssignment::with(['teacher', 'subject.category'])
                 ->where('class_id', $classId)
                 ->where('is_active', true);
-                
+
             // Apply section filter if provided (allowing both specific section and class-wide assignments)
             if ($sectionId) {
                 $query->where(function($q) use ($sectionId) {
@@ -1089,7 +1036,7 @@ class TimetableView extends Component
                       ->orWhereNull('section_id');
                 });
             }
-            
+
             // Apply academic year filter if available
             if ($academicSession) {
                 $query->where(function($q) use ($academicSession) {
@@ -1097,7 +1044,7 @@ class TimetableView extends Component
                       ->orWhereNull('academic_year_id');
                 });
             }
-            
+
             // Apply academic term filter if available
             if ($academicTerm) {
                 $query->where(function($q) use ($academicTerm) {
@@ -1105,9 +1052,9 @@ class TimetableView extends Component
                       ->orWhereNull('academic_term');
                 });
             }
-            
+
             $assignments = $query->get();
-            
+
             if ($assignments->isEmpty()) {
                 Log::warning('No teacher subject assignments found for this class/section/term', [
                     'class_id' => $classId,
@@ -1115,7 +1062,7 @@ class TimetableView extends Component
                     'academic_session' => $academicSession,
                     'academic_term' => $academicTerm
                 ]);
-                
+
                 // Try a less restrictive query without term filter first
                 $backupAssignments = TeacherSubjectAssignment::with(['teacher', 'subject.category'])
                     ->where('class_id', $classId)
@@ -1133,7 +1080,7 @@ class TimetableView extends Component
                         });
                     })
                     ->get();
-                    
+
                 if ($backupAssignments->isNotEmpty()) {
                     Log::info("Found {$backupAssignments->count()} backup teacher assignments without term filter");
                     $assignments = $backupAssignments;
@@ -1149,7 +1096,7 @@ class TimetableView extends Component
                             });
                         })
                         ->get();
-                        
+
                     if ($finalBackupAssignments->isNotEmpty()) {
                         Log::info("Found {$finalBackupAssignments->count()} final backup teacher assignments without any term/session filters");
                         $assignments = $finalBackupAssignments;
@@ -1159,42 +1106,42 @@ class TimetableView extends Component
                 }
                 }
             }
-            
-                Log::info("Found {$assignments->count()} teacher-subject assignments for class $classId" . 
+
+                Log::info("Found {$assignments->count()} teacher-subject assignments for class $classId" .
                     ($sectionId ? ", section $sectionId" : ""));
-            
+
             // Process assignments into subject preferences
             $subjectPreferences = [];
-            
+
             foreach ($assignments as $assignment) {
                 $subject = $assignment->subject;
                 $teacher = $assignment->teacher;
-                
+
                 if (!$subject) {
                     Log::warning("Assignment {$assignment->id} has no valid subject");
                     continue;
                 }
-                
+
                 if (!$teacher) {
                     Log::warning("Assignment {$assignment->id} has no valid teacher");
                     continue;
                 }
-                
+
                 $subjectId = $subject->id;
                 $categoryName = optional($subject->category)->name ?? 'Uncategorized';
                 $categoryId = optional($subject->category)->id;
-                
+
                 // Skip if we already have a primary teacher for this subject
                 // and the current assignment is not primary
-                if (isset($subjectPreferences[$subjectId]) && 
-                    $subjectPreferences[$subjectId]['is_primary'] && 
+                if (isset($subjectPreferences[$subjectId]) &&
+                    $subjectPreferences[$subjectId]['is_primary'] &&
                     !$assignment->is_primary) {
                     continue;
                 }
-                
+
                 // Override existing non-primary assignment with a primary one
-                if (isset($subjectPreferences[$subjectId]) && 
-                    !$subjectPreferences[$subjectId]['is_primary'] && 
+                if (isset($subjectPreferences[$subjectId]) &&
+                    !$subjectPreferences[$subjectId]['is_primary'] &&
                     $assignment->is_primary) {
                     // This is a better assignment (primary), so we'll replace the existing one
                 } else if (isset($subjectPreferences[$subjectId])) {
@@ -1203,7 +1150,7 @@ class TimetableView extends Component
                         continue;
                     }
                 }
-                
+
                 // Create base preferences with more data from the assignment
                 $preferences = [
                     'name' => $subject->subject_name,
@@ -1219,17 +1166,17 @@ class TimetableView extends Component
                     'weekly_frequency' => 3,
                     'daily_limit' => 1
                 ];
-                
+
                 // Customize based on subject type
                 $this->customizeSubjectPreferences($preferences, $subject, $categoryName);
-                
+
                 // Add to preferences array
                 $subjectPreferences[$subjectId] = $preferences;
-                
-                Log::debug("Added subject preference: {$subject->subject_name} with teacher {$teacher->name} " . 
+
+                Log::debug("Added subject preference: {$subject->subject_name} with teacher {$teacher->name} " .
                     ($assignment->is_primary ? '(PRIMARY)' : ''));
             }
-            
+
             // Only update if we have data
             if (!empty($subjectPreferences)) {
                 $this->autoGenerateForm['subject_preferences'] = $subjectPreferences;
@@ -1237,7 +1184,7 @@ class TimetableView extends Component
             } else {
                 Log::warning("No subject preferences could be created from assignments");
             }
-            
+
         } catch (\Exception $e) {
             Log::error('Error loading teacher subject assignments: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
@@ -1245,7 +1192,7 @@ class TimetableView extends Component
             // Fallback preferences remain in place
         }
     }
-    
+
     /**
      * Customize subject preferences based on subject type/category
      */
@@ -1254,53 +1201,53 @@ class TimetableView extends Component
         // Convert category name to lowercase for consistent comparison
         $lowerCategoryName = strtolower($categoryName);
         $subjectName = strtolower($subject->subject_name);
-        
+
         // Core subjects like Math/Science are best in morning
-        if (str_contains($lowerCategoryName, 'math') || 
-            str_contains($lowerCategoryName, 'science') || 
-            str_contains($subjectName, 'math') || 
+        if (str_contains($lowerCategoryName, 'math') ||
+            str_contains($lowerCategoryName, 'science') ||
+            str_contains($subjectName, 'math') ||
             str_contains($subjectName, 'science')) {
             $preferences['preferred_time'] = 'morning';
             $preferences['weekly_frequency'] = 5;
         }
-        
+
         // Languages also benefit from morning slots
-        elseif (str_contains($lowerCategoryName, 'language') || 
-                str_contains($subjectName, 'english') || 
+        elseif (str_contains($lowerCategoryName, 'language') ||
+                str_contains($subjectName, 'english') ||
                 str_contains($subjectName, 'language')) {
             $preferences['preferred_time'] = 'morning';
             $preferences['weekly_frequency'] = 5;
         }
-        
+
         // Arts, creative subjects in afternoon
-        elseif (str_contains($lowerCategoryName, 'art') || 
-                str_contains($lowerCategoryName, 'music') || 
+        elseif (str_contains($lowerCategoryName, 'art') ||
+                str_contains($lowerCategoryName, 'music') ||
                 str_contains($lowerCategoryName, 'creative')) {
             $preferences['preferred_time'] = 'afternoon';
             $preferences['weekly_frequency'] = 2;
             $preferences['max_consecutive'] = 3;
         }
-        
+
         // Physical education in afternoon
-        elseif (str_contains($lowerCategoryName, 'physical') || 
-                str_contains($lowerCategoryName, 'sport') || 
-                str_contains($subjectName, 'p.e') || 
+        elseif (str_contains($lowerCategoryName, 'physical') ||
+                str_contains($lowerCategoryName, 'sport') ||
+                str_contains($subjectName, 'p.e') ||
                 str_contains($subjectName, 'physical')) {
             $preferences['preferred_time'] = 'afternoon';
             $preferences['weekly_frequency'] = 2;
             $preferences['max_consecutive'] = 2;
         }
-        
+
         // Computer classes
-        elseif (str_contains($lowerCategoryName, 'computer') || 
-                str_contains($lowerCategoryName, 'technology') || 
-                str_contains($subjectName, 'computer') || 
+        elseif (str_contains($lowerCategoryName, 'computer') ||
+                str_contains($lowerCategoryName, 'technology') ||
+                str_contains($subjectName, 'computer') ||
                 str_contains($subjectName, 'ict')) {
             $preferences['preferred_time'] = 'midday';
             $preferences['weekly_frequency'] = 2;
         }
     }
-    
+
     /**
      * Get preloaded subject preferences for immediate display
      * This provides good default data to show immediately while actual data loads
@@ -1308,7 +1255,7 @@ class TimetableView extends Component
     private function getPreloadedSubjectPreferences()
     {
         $preloaded = [];
-        
+
         // Add some common subjects with sensible defaults
         $commonSubjects = [
             ['id' => 'temp1', 'name' => 'Mathematics', 'category' => 'Core', 'time' => 'morning', 'freq' => 5],
@@ -1318,7 +1265,7 @@ class TimetableView extends Component
             ['id' => 'temp5', 'name' => 'Physical Education', 'category' => 'Activity', 'time' => 'afternoon', 'freq' => 2],
             ['id' => 'temp6', 'name' => 'Art', 'category' => 'Creative', 'time' => 'afternoon', 'freq' => 2]
         ];
-        
+
         foreach ($commonSubjects as $subject) {
             $preloaded[$subject['id']] = [
                 'name' => $subject['name'],
@@ -1332,35 +1279,29 @@ class TimetableView extends Component
                 'daily_limit' => 1
             ];
         }
-        
+
         return $preloaded;
     }
-    
-    /**
-     * Closes the auto-generate timetable modal
-     */
-    public function closeAutoGenerateModal()
-    {
-        $this->showAutoGenerateModal = false;
-    }
-    
+
     /**
      * Auto-generate the timetable based on teacher-subject assignments
      */
     public function autoGenerateTimetable()
     {
+        $this->loading = true;
+
         $this->validate([
             'autoGenerateForm.days' => 'required|array|min:1',
             'autoGenerateForm.max_daily_subjects' => 'required|numeric|min:1|max:10',
         ]);
-        
+
         try {
             // Validate subject preferences
             if (empty($this->autoGenerateForm['subject_preferences'])) {
                 toast()->warning('No subject preferences found. Cannot auto-generate timetable.')->push();
                 return;
             }
-            
+
             // Basic validation for subject preferences
             $hasValidSubjects = false;
             foreach ($this->autoGenerateForm['subject_preferences'] as $subjectId => $preferences) {
@@ -1369,42 +1310,42 @@ class TimetableView extends Component
                 if (!$subject) {
                     continue;
                 }
-                
+
                 // Check that we have at least one valid weekly frequency
                 if ($preferences['weekly_frequency'] > 0) {
                     $hasValidSubjects = true;
                     break;
                 }
             }
-            
+
             if (!$hasValidSubjects) {
                 toast()->warning('No valid subjects with positive weekly frequency found. Cannot auto-generate timetable.')->push();
                 return;
             }
-            
+
             // Get necessary information
             $timetable = $this->timetable;
             if (!$timetable) {
                 toast()->danger('No timetable found for the current class.')->push();
                 return;
             }
-            
+
             $timetableId = $timetable->id;
             $classId = $timetable->class_id;
             $sectionId = $this->sectionId;
-            
+
             // Get class and section names for display
             $className = '';
             if ($timetable->myClass) {
                 $className = $timetable->myClass->name;
             }
-            
+
             $sectionName = '';
             $section = $this->section;
             if ($section) {
                 $sectionName = $section->name;
             }
-            
+
             // Ensure that the min_category_per_day is properly set
             if (!isset($this->autoGenerateForm['min_category_per_day']) || empty($this->autoGenerateForm['min_category_per_day'])) {
                 $this->autoGenerateForm['min_category_per_day'] = [
@@ -1414,7 +1355,7 @@ class TimetableView extends Component
                     'Science' => 1
                 ];
             }
-            
+
             // Log the auto-generate settings for debugging
             \Log::info("Auto-generate settings", [
                 'days' => $this->autoGenerateForm['days'],
@@ -1422,10 +1363,10 @@ class TimetableView extends Component
                 'clear_existing' => $this->autoGenerateForm['clear_existing'],
                 'respect_existing_entries' => $this->autoGenerateForm['respect_existing_entries']
             ]);
-            
+
             // Create the auto-generate service
             $autoGenerateService = new AutoGenerateService();
-            
+
             // Run the auto-generate process
             $stats = $autoGenerateService->generate(
                 $this->autoGenerateForm,
@@ -1435,7 +1376,7 @@ class TimetableView extends Component
                 $className,
                 $sectionName
             );
-            
+
             // Ensure stats is an array
             if (!is_array($stats)) {
                 $stats = ['entries_created' => 0, 'skipped' => 0, 'conflicts' => 0];
@@ -1444,44 +1385,46 @@ class TimetableView extends Component
                     'value' => $stats
                 ]);
             }
-            
+
             // Reload the timetable data
             $this->refreshTimetable();
             $this->closeAutoGenerateModal();
-            
+
             // Show a success message with statistics
-            if (isset($stats['entries_created']) && $stats['entries_created'] > 0 || 
+            if (isset($stats['entries_created']) && $stats['entries_created'] > 0 ||
                 isset($stats['cleared']) && $stats['cleared'] > 0) {
                 $message = "Auto-generated timetable: ";
-                
+
                 // Information about clearing or respecting existing entries
                 if (isset($stats['cleared']) && $stats['cleared'] > 0) {
                     $message .= "{$stats['cleared']} existing entries cleared, ";
                 }
-                
+
                 $message .= (isset($stats['entries_created']) ? $stats['entries_created'] : 0) . " new entries created";
-                
+
                 if (isset($stats['conflicts']) && $stats['conflicts'] > 0) {
                     $message .= ", {$stats['conflicts']} conflicts skipped";
                 }
                 if (isset($stats['skipped']) && $stats['skipped'] > 0) {
                     $message .= ", {$stats['skipped']} slots skipped";
                 }
-                
+
                 toast()->success($message)->push();
             } else {
                 toast()->warning("No entries created. Please check your settings and try again.")->push();
             }
-            
+
         } catch (\Exception $e) {
             \Log::error("Auto-generate error: " . $e->getMessage());
             toast()->danger('Error: ' . $e->getMessage())->push();
+        } finally {
+            $this->loading = false;
         }
     }
-    
+
     /**
      * Check for teacher scheduling conflicts
-     * 
+     *
      * @param string $day
      * @param int $periodId
      * @param int $teacherId
@@ -1494,7 +1437,7 @@ class TimetableView extends Component
             ->where('teacher_id', $teacherId)
             ->exists();
     }
-    
+
     /**
      * Get effective timetable ID, falling back to timetable object if needed
      *
@@ -1506,17 +1449,17 @@ class TimetableView extends Component
         if (!empty($this->timetableRecordId)) {
             return $this->timetableRecordId;
         }
-        
+
         // If that's empty, try to use the ID from the timetable object
         if (isset($this->timetable) && $this->timetable) {
             \Log::info("Using timetable object ID as fallback: {$this->timetable->id}");
             return $this->timetable->id;
         }
-        
+
         // If both are empty, return null to indicate no valid ID
         return null;
     }
-    
+
     /**
      * Print the timetable
      */
@@ -1526,13 +1469,13 @@ class TimetableView extends Component
             // Use the effective ID with fallback mechanism
             $timetableId = $this->getEffectiveTimetableId();
             $sectionId = $this->sectionId;
-            
+
             if (empty($timetableId)) {
                 \Log::error("Cannot print timetable - no valid timetable ID available");
                 toast()->danger('Error: Cannot print - Timetable ID is missing')->push();
                 return false;
             }
-            
+
             // Check if timetable exists in database
             $timetable = SchoolTimetable::find($timetableId);
             if (!$timetable) {
@@ -1540,38 +1483,38 @@ class TimetableView extends Component
                 toast()->danger('Error: Timetable not found')->push();
                 return false;
             }
-            
+
             // Generate URL for the print view
             try {
                 $printUrl = route('tt.print', ['timetableId' => $timetableId, 'sectionId' => $sectionId]);
-                
+
                 // Log the generated URL for debugging
                 \Log::info("Print URL generated: {$printUrl}");
-                
+
                 // Dispatch event to open the print window in a new tab
                 // Using both methods for compatibility
                 $this->dispatch('openPrintWindow', ['url' => $printUrl]);
                 $this->dispatchBrowserEvent('openPrintWindow', ['url' => $printUrl]);
-                
+
                 // As a fallback, we'll also pass the URL to the browser's session storage
                 // This allows a JavaScript fallback to pick it up if events fail
                 session()->flash('print_url', $printUrl);
-                
+
                 // Return the URL for direct access if needed
                 return $printUrl;
             } catch (\Exception $e) {
                 // If route generation fails, try direct URL
                 \Log::error("Error generating print URL: " . $e->getMessage());
-                
+
                 // Fallback to direct URL construction
                 $printUrl = url("timetables/print/{$timetableId}" . ($sectionId ? "/{$sectionId}" : ""));
                 \Log::info("Using fallback print URL: {$printUrl}");
-                
+
                 // Dispatch with fallback URL
                 $this->dispatch('openPrintWindow', ['url' => $printUrl]);
                 $this->dispatchBrowserEvent('openPrintWindow', ['url' => $printUrl]);
                 session()->flash('print_url', $printUrl);
-                
+
                 return $printUrl;
             }
         } catch (\Exception $e) {
@@ -1580,7 +1523,7 @@ class TimetableView extends Component
             return false;
         }
     }
-    
+
     /**
      * Export the timetable as PDF
      */
@@ -1590,13 +1533,13 @@ class TimetableView extends Component
             // Use the effective ID with fallback mechanism
             $timetableId = $this->getEffectiveTimetableId();
             $sectionId = $this->sectionId;
-            
+
             if (empty($timetableId)) {
                 \Log::error("Cannot export PDF - no valid timetable ID available");
                 toast()->danger('Error: Cannot export - Timetable ID is missing')->push();
                 return false;
             }
-            
+
             // Check if timetable exists in database
             $timetable = SchoolTimetable::find($timetableId);
             if (!$timetable) {
@@ -1604,39 +1547,39 @@ class TimetableView extends Component
                 toast()->danger('Error: Timetable not found')->push();
                 return false;
             }
-            
+
             // Generate URL for the PDF export
             try {
                 $pdfUrl = route('tt.export.pdf', ['timetableId' => $timetableId, 'sectionId' => $sectionId]);
-                
+
                 // Log the generated URL for debugging
                 \Log::info("PDF URL generated: {$pdfUrl}");
-                
+
                 // Dispatch event to trigger the download
                 // Using both methods for compatibility
                 $this->dispatch('triggerDownload', ['url' => $pdfUrl]);
                 $this->dispatchBrowserEvent('triggerDownload', ['url' => $pdfUrl]);
-                
+
                 // As a fallback, we'll also pass the URL to the browser's session storage
                 // This allows a JavaScript fallback to pick it up if events fail
                 session()->flash('download_url', $pdfUrl);
-                
+
                 // Perform a direct redirect as a last resort
                 // This will work even if JavaScript events fail
                 return redirect()->to($pdfUrl);
             } catch (\Exception $e) {
                 // If route generation fails, try direct URL
                 \Log::error("Error generating PDF URL: " . $e->getMessage());
-                
+
                 // Fallback to direct URL construction
                 $pdfUrl = url("timetables/export/pdf/{$timetableId}" . ($sectionId ? "/{$sectionId}" : ""));
                 \Log::info("Using fallback PDF URL: {$pdfUrl}");
-                
+
                 // Dispatch with fallback URL
                 $this->dispatch('triggerDownload', ['url' => $pdfUrl]);
                 $this->dispatchBrowserEvent('triggerDownload', ['url' => $pdfUrl]);
                 session()->flash('download_url', $pdfUrl);
-                
+
                 return redirect()->to($pdfUrl);
             }
         } catch (\Exception $e) {
@@ -1645,7 +1588,7 @@ class TimetableView extends Component
             return false;
         }
     }
-    
+
     /**
      * Export the timetable as Excel
      */
@@ -1655,13 +1598,13 @@ class TimetableView extends Component
             // Use the effective ID with fallback mechanism
             $timetableId = $this->getEffectiveTimetableId();
             $sectionId = $this->sectionId;
-            
+
             if (empty($timetableId)) {
                 \Log::error("Cannot export Excel - no valid timetable ID available");
                 toast()->danger('Error: Cannot export - Timetable ID is missing')->push();
                 return false;
             }
-            
+
             // Check if timetable exists in database
             $timetable = SchoolTimetable::find($timetableId);
             if (!$timetable) {
@@ -1669,39 +1612,39 @@ class TimetableView extends Component
                 toast()->danger('Error: Timetable not found')->push();
                 return false;
             }
-            
+
             // Generate URL for the Excel export
             try {
                 $excelUrl = route('tt.export.excel', ['timetableId' => $timetableId, 'sectionId' => $sectionId]);
-                
+
                 // Log the generated URL for debugging
                 \Log::info("Excel URL generated: {$excelUrl}");
-                
+
                 // Dispatch event to trigger the download
                 // Using both methods for compatibility
                 $this->dispatch('triggerDownload', ['url' => $excelUrl]);
                 $this->dispatchBrowserEvent('triggerDownload', ['url' => $excelUrl]);
-                
+
                 // As a fallback, we'll also pass the URL to the browser's session storage
                 // This allows a JavaScript fallback to pick it up if events fail
                 session()->flash('download_url', $excelUrl);
-                
+
                 // Perform a direct redirect as a last resort
                 // This will work even if JavaScript events fail
                 return redirect()->to($excelUrl);
             } catch (\Exception $e) {
                 // If route generation fails, try direct URL
                 \Log::error("Error generating Excel URL: " . $e->getMessage());
-                
+
                 // Fallback to direct URL construction
                 $excelUrl = url("timetables/export/excel/{$timetableId}" . ($sectionId ? "/{$sectionId}" : ""));
                 \Log::info("Using fallback Excel URL: {$excelUrl}");
-                
+
                 // Dispatch with fallback URL
                 $this->dispatch('triggerDownload', ['url' => $excelUrl]);
                 $this->dispatchBrowserEvent('triggerDownload', ['url' => $excelUrl]);
                 session()->flash('download_url', $excelUrl);
-                
+
                 return redirect()->to($excelUrl);
             }
         } catch (\Exception $e) {
@@ -1714,7 +1657,7 @@ class TimetableView extends Component
     /**
      * Get the current time slots based on the current time
      * This helps to highlight the current active periods
-     * 
+     *
      * @return array
      */
     public function getCurrentTimeSlots()
@@ -1722,13 +1665,13 @@ class TimetableView extends Component
         $now = now();
         $currentDay = strtolower($now->format('l'));
         $currentTime = $now->format('H:i:s');
-        
+
         $periods = $this->getPeriodsProperty();
-        
+
         $currentPeriods = $periods->filter(function($period) use ($currentTime) {
             return $currentTime >= $period->start_time && $currentTime <= $period->end_time;
         });
-        
+
         return [
             'day' => $currentDay,
             'time' => $currentTime,
@@ -1738,7 +1681,7 @@ class TimetableView extends Component
 
     /**
      * Get background color class for period based on its type
-     * 
+     *
      * @param mixed $period
      * @return string
      */
@@ -1747,9 +1690,9 @@ class TimetableView extends Component
         if (!$period) {
             return 'bg-gray-50';
         }
-        
+
         $name = strtolower($period->period_name ?? '');
-        
+
         if (str_contains($name, 'break') || str_contains($name, 'lunch') || str_contains($name, 'recess')) {
             return 'bg-green-50 text-green-700 border-green-100';
         } elseif (str_contains($name, 'assembly') || str_contains($name, 'homeroom')) {
@@ -1765,16 +1708,16 @@ class TimetableView extends Component
 
     /**
      * Get the next upcoming period
-     * 
+     *
      * @return mixed
      */
     public function getNextPeriod()
     {
         $now = now();
         $currentTime = $now->format('H:i:s');
-        
+
         $periods = $this->getPeriodsProperty();
-        
+
         return $periods
             ->where('start_time', '>', $currentTime)
             ->sortBy('start_time')
@@ -1800,7 +1743,7 @@ class TimetableView extends Component
     /**
      * Get subjects for the current class and section
      * Prioritizing subjects that have teacher assignments
-     * 
+     *
      * @param int $classId
      * @param int|null $sectionId
      * @return \Illuminate\Database\Eloquent\Collection
@@ -1811,15 +1754,15 @@ class TimetableView extends Component
         $timetableRecord = SchoolTimetable::find($this->timetableRecordId);
         $academicSession = $timetableRecord ? $timetableRecord->academic_session : null;
         $academicTerm = $timetableRecord ? $timetableRecord->academic_term : null;
-        
-        \Log::debug("Getting subjects for class ID $classId" . 
-            ($sectionId ? ", section ID $sectionId" : "") . 
+
+        \Log::debug("Getting subjects for class ID $classId" .
+            ($sectionId ? ", section ID $sectionId" : "") .
             ", academic session: $academicSession, term: $academicTerm");
-        
+
         // Get the subjects associated with teacher-subject assignments for this class/section
         $query = TeacherSubjectAssignment::where('class_id', $classId)
             ->where('is_active', true);
-            
+
         // Apply section filter if provided (allowing both specific section and class-wide assignments)
         if ($sectionId) {
             $query->where(function($q) use ($sectionId) {
@@ -1827,7 +1770,7 @@ class TimetableView extends Component
                       ->orWhereNull('section_id');
                 });
         }
-            
+
         // Filter by academic year if available
         if ($academicSession) {
             $query->where(function($q) use ($academicSession) {
@@ -1835,7 +1778,7 @@ class TimetableView extends Component
                   ->orWhereNull('academic_year_id');
             });
         }
-            
+
         // Filter by academic term if available
         if ($academicTerm) {
             $query->where(function($q) use ($academicTerm) {
@@ -1843,50 +1786,50 @@ class TimetableView extends Component
                   ->orWhereNull('academic_term');
             });
         }
-            
+
         $subjectIds = $query->pluck('subject_id')->unique()->toArray();
-            
+
         \Log::debug("Found " . count($subjectIds) . " subject IDs from teacher assignments");
-        
+
         // If no subjects found from assignments, try less restricted query (by session only)
         if (empty($subjectIds) && $academicSession) {
             $backupQuery = TeacherSubjectAssignment::where('class_id', $classId)
                 ->where('is_active', true);
-                
+
             if ($sectionId) {
                 $backupQuery->where(function($q) use ($sectionId) {
                     $q->where('section_id', $sectionId)
                       ->orWhereNull('section_id');
                 });
             }
-                
+
             $backupQuery->where(function($q) use ($academicSession) {
                 $q->where('academic_year_id', $academicSession)
                   ->orWhereNull('academic_year_id');
             });
-                
+
             $subjectIds = $backupQuery->pluck('subject_id')->unique()->toArray();
-            
+
             \Log::debug("Found " . count($subjectIds) . " subject IDs from backup teacher assignments (by session only)");
         }
-        
+
         // If still no subjects found, try with no filters
         if (empty($subjectIds)) {
             $finalBackupQuery = TeacherSubjectAssignment::where('class_id', $classId)
                 ->where('is_active', true);
-                
+
             if ($sectionId) {
                 $finalBackupQuery->where(function($q) use ($sectionId) {
                     $q->where('section_id', $sectionId)
                       ->orWhereNull('section_id');
                 });
             }
-                
+
             $subjectIds = $finalBackupQuery->pluck('subject_id')->unique()->toArray();
-            
+
             \Log::debug("Found " . count($subjectIds) . " subject IDs from final backup teacher assignments (no filters)");
         }
-            
+
         // If still no subjects found from assignments, return all subjects as a fallback
         if (empty($subjectIds)) {
             \Log::warning("No subjects found from teacher assignments, returning all subjects as fallback");
@@ -1895,16 +1838,16 @@ class TimetableView extends Component
                 ->limit(15) // Limit to prevent overwhelming the form
                 ->get();
         }
-            
+
         // Now get the full subject details with their categories
         $subjects = Subject::with('category')
             ->whereIn('id', $subjectIds)
             ->orderBy('subject_name')
             ->get();
-            
-        \Log::info("Retrieved {$subjects->count()} subjects for class ID $classId" . 
+
+        \Log::info("Retrieved {$subjects->count()} subjects for class ID $classId" .
             ($sectionId ? ", section ID $sectionId" : ""));
-            
+
         return $subjects;
     }
 
@@ -1915,17 +1858,17 @@ class TimetableView extends Component
     {
         // Rebuild the timetable matrix
         $this->buildTimetableMatrix();
-        
+
         // Check if there are weekend slots
         $this->checkWeekendSlots();
-        
+
         // Fire an event to let any JavaScript know we've refreshed
         $this->dispatch('timetableRefreshed');
     }
 
     /**
      * Get CSS classes for time preference match
-     * 
+     *
      * @param int $subjectId
      * @param object $period
      * @return string
@@ -1937,48 +1880,48 @@ class TimetableView extends Component
             if (empty($subjectId) || empty($period)) {
                 return 'bg-white';
             }
-            
+
             // Get subject preferences
             $subjectPreferences = $this->autoGenerateForm['subject_preferences'][$subjectId] ?? null;
             if (!$subjectPreferences) {
                 return 'bg-white';
             }
-            
+
             // Get preferred time
             $preferredTime = $subjectPreferences['preferred_time'] ?? 'any';
             if ($preferredTime === 'any') {
                 return 'bg-white'; // No specific preference
             }
-            
+
             // Determine time of day for this period
             $periodTime = $this->getPeriodTimeOfDay($period);
-            
+
             // Perfect match - preferred time matches actual time
             if ($preferredTime === $periodTime) {
                 return 'bg-green-50 border-green-200';  // Green for optimal match
             }
-            
+
             // Acceptable match - adjacent time periods
             if (
-                ($preferredTime === 'morning' && $periodTime === 'midday') || 
+                ($preferredTime === 'morning' && $periodTime === 'midday') ||
                 ($preferredTime === 'midday' && ($periodTime === 'morning' || $periodTime === 'afternoon')) ||
                 ($preferredTime === 'afternoon' && $periodTime === 'midday')
             ) {
                 return 'bg-yellow-50 border-yellow-200';  // Yellow for acceptable match
             }
-            
+
             // Poor match - opposite time periods
             return 'bg-red-50 border-red-200';  // Red for poor match
-            
+
         } catch (\Exception $e) {
             \Log::error("Error in getTimePreferenceClass: " . $e->getMessage());
             return 'bg-white';
         }
     }
-    
+
     /**
      * Determine the time of day for a period
-     * 
+     *
      * @param object $period
      * @return string
      */
@@ -1989,18 +1932,18 @@ class TimetableView extends Component
             $startTime = $period->start_time;
             $parts = explode(':', $startTime);
             $minutes = (intval($parts[0]) * 60) + intval($parts[1]);
-            
+
             // Get midpoint of period for more accurate categorization
             $endTime = $period->end_time;
             $endParts = explode(':', $endTime);
             $endMinutes = (intval($endParts[0]) * 60) + intval($endParts[1]);
-            
+
             // Use the midpoint of the period
             $midpointMinutes = ($minutes + $endMinutes) / 2;
-            
+
             // Use time preferences from auto-generate form
             $timePreferences = $this->autoGenerateForm['time_preferences'];
-            
+
             if ($midpointMinutes <= $timePreferences['morning_end']) {
                 return 'morning';
             } elseif ($midpointMinutes <= $timePreferences['midday_end']) {
@@ -2016,7 +1959,7 @@ class TimetableView extends Component
 
     /**
      * Gets default subject preferences for the auto-generate form
-     * 
+     *
      * @param \App\Models\Subject $subject
      * @return array
      */
@@ -2025,7 +1968,7 @@ class TimetableView extends Component
         try {
             // Get current academic session
             $currentSession = Setting::where('key', 'current_session')->first()->value ?? date('Y');
-            
+
             // Initialize with default values
             $preferences = [
                 'name' => $subject->subject_name,
@@ -2038,10 +1981,10 @@ class TimetableView extends Component
                 'weekly_frequency' => 3,
                 'daily_limit' => 1
             ];
-            
+
             // Log the subject for debugging
             \Log::debug("Setting up preferences for subject: {$subject->subject_name} (ID: {$subject->id})");
-            
+
             // Try to get teacher assignments for this subject
             $teacherAssignment = TeacherSubjectAssignment::where('subject_id', $subject->id)
                 ->where('class_id', $this->timetable->class_id)
@@ -2053,7 +1996,7 @@ class TimetableView extends Component
                 })
                 ->where('is_active', true)
                 ->first();
-                
+
             if ($teacherAssignment && $teacherAssignment->teacher_id) {
                 $teacher = User::find($teacherAssignment->teacher_id);
                 if ($teacher) {
@@ -2064,67 +2007,67 @@ class TimetableView extends Component
             } else {
                 \Log::debug("No teacher assignment found for subject {$subject->subject_name}");
             }
-            
+
             // Set preferred time based on subject category
             if ($subject->category) {
                 $categoryName = strtolower($subject->category->name);
-                
+
                 // Core subjects like Math/Science are best in morning
-                if (str_contains($categoryName, 'math') || 
-                    str_contains($categoryName, 'science') || 
-                    str_contains($subject->subject_name, 'Math') || 
+                if (str_contains($categoryName, 'math') ||
+                    str_contains($categoryName, 'science') ||
+                    str_contains($subject->subject_name, 'Math') ||
                     str_contains($subject->subject_name, 'Science')) {
                     $preferences['preferred_time'] = 'morning';
                     $preferences['weekly_frequency'] = 5; // Core subjects typically have higher frequency
                 }
-                
+
                 // Languages also benefit from morning slots
-                elseif (str_contains($categoryName, 'language') || 
-                        str_contains($subject->subject_name, 'English') || 
+                elseif (str_contains($categoryName, 'language') ||
+                        str_contains($subject->subject_name, 'English') ||
                         str_contains($subject->subject_name, 'Language')) {
                     $preferences['preferred_time'] = 'morning';
                     $preferences['weekly_frequency'] = 5;
                 }
-                
+
                 // Arts, creative subjects in afternoon
-                elseif (str_contains($categoryName, 'art') || 
-                        str_contains($categoryName, 'music') || 
+                elseif (str_contains($categoryName, 'art') ||
+                        str_contains($categoryName, 'music') ||
                         str_contains($categoryName, 'creative')) {
                     $preferences['preferred_time'] = 'afternoon';
                     $preferences['weekly_frequency'] = 2;
                     $preferences['max_consecutive'] = 3; // Art classes often work better as longer blocks
                 }
-                
+
                 // Physical education in afternoon
-                elseif (str_contains($categoryName, 'physical') || 
-                        str_contains($categoryName, 'sport') || 
-                        str_contains($subject->subject_name, 'P.E') || 
+                elseif (str_contains($categoryName, 'physical') ||
+                        str_contains($categoryName, 'sport') ||
+                        str_contains($subject->subject_name, 'P.E') ||
                         str_contains($subject->subject_name, 'Physical')) {
                     $preferences['preferred_time'] = 'afternoon';
                     $preferences['weekly_frequency'] = 2;
                     $preferences['max_consecutive'] = 2;
                 }
-                
+
                 // Computer classes
-                elseif (str_contains($categoryName, 'computer') || 
-                        str_contains($categoryName, 'technology') || 
-                        str_contains($subject->subject_name, 'Computer') || 
+                elseif (str_contains($categoryName, 'computer') ||
+                        str_contains($categoryName, 'technology') ||
+                        str_contains($subject->subject_name, 'Computer') ||
                         str_contains($subject->subject_name, 'ICT')) {
                     $preferences['preferred_time'] = 'midday';
                     $preferences['weekly_frequency'] = 2;
                 }
-                
+
                 // Default for other subjects
                 else {
                     $preferences['preferred_time'] = 'any';
                     $preferences['weekly_frequency'] = 3;
                 }
             }
-            
+
             return $preferences;
         } catch (\Exception $e) {
             \Log::error("Error generating preferences for subject ID {$subject->id}: " . $e->getMessage());
-            
+
             // Return safe defaults in case of any error
             return [
                 'name' => $subject->subject_name ?? 'Unknown Subject',
@@ -2156,4 +2099,4 @@ class TimetableView extends Component
             return collect();
         }
     }
-} 
+}

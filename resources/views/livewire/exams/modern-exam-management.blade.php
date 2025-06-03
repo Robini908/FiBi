@@ -1,4 +1,48 @@
-<div class="max-w-full bg-white overflow-hidden border border-gray-200 rounded-lg shadow-sm">
+<div 
+    x-data="{ 
+        init() {
+            console.log('Alpine component initialized');
+            
+            // Listen for Livewire updates to make sure only one card is visible
+            this.$watch('$wire.isCreating', (value) => {
+                if(value) {
+                    console.log('Creating exam card is now visible');
+                }
+            });
+            
+            this.$watch('$wire.isEditing', (value) => {
+                if(value) {
+                    console.log('Editing exam card is now visible');
+                }
+            });
+            
+            this.$watch('$wire.showExamDetails', (value) => {
+                if(value) {
+                    console.log('Exam details card is now visible');
+                }
+            });
+            
+            this.$watch('$wire.showGradingForm', (value) => {
+                if(value) {
+                    console.log('Grading system form card is now visible');
+                }
+            });
+            
+            this.$watch('$wire.showGradingDetails', (value) => {
+                if(value) {
+                    console.log('Grading system details card is now visible');
+                }
+            });
+            
+            this.$watch('$wire.confirmingDelete', (value) => {
+                if(value) {
+                    console.log('Delete confirmation card is now visible');
+                }
+            });
+        }
+    }"
+    class="max-w-full bg-white overflow-hidden border border-gray-200 rounded-lg shadow-sm"
+>
     <!-- Error information -->
     @if($errorInfo)
     <div class="m-4">
@@ -81,7 +125,133 @@
         </nav>
     </div>
 
-    <!-- Tab content with animation -->
+    <!-- Card for exam/grading system form (replaces modal) -->
+    @if($isCreating || $isEditing || $showGradingForm)
+    <div class="transition-all transform duration-300 ease-in-out bg-white border-b border-gray-200">
+        <div class="p-4">
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <!-- Card Header -->
+                <div class="bg-green-50 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-green-100">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        @if($isCreating)
+                            Create New Exam
+                        @elseif($isEditing)
+                            Edit Exam
+                        @elseif($showGradingForm)
+                            {{ $isEditingGradingSystem ? 'Edit Grading System' : 'Create New Grading System' }}
+                        @endif
+                    </h3>
+                    <button wire:click="resetForm" type="button" class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 rounded-full p-1 transition-colors duration-200">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Card Content -->
+                <div class="p-6">
+                    @if($isCreating || $isEditing)
+                        @include('livewire.exams.partials.cards.exam-form')
+                    @elseif($showGradingForm)
+                        @include('livewire.exams.partials.cards.grading-system-form')
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Card for exam/grading system details (replaces modal) -->
+    @if($showExamDetails || $showGradingDetails)
+    <div class="transition-all transform duration-300 ease-in-out bg-white border-b border-gray-200">
+        <div class="p-4">
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <!-- Card Header -->
+                <div class="bg-blue-50 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-blue-100">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        @if($showExamDetails)
+                            Exam Details
+                        @elseif($showGradingDetails)
+                            Grading System Details
+                        @endif
+                    </h3>
+                    <button wire:click="closeDetails" type="button" class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-full p-1 transition-colors duration-200">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Card Content -->
+                <div class="p-6">
+                    @if($showExamDetails)
+                        @include('livewire.exams.partials.cards.exam-details')
+                    @elseif($showGradingDetails)
+                        @include('livewire.exams.partials.cards.grading-system-details')
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Confirmation Card (replaces delete confirmation modal) -->
+    @if($confirmingDelete)
+    <div class="transition-all transform duration-300 ease-in-out bg-white border-b border-gray-200">
+        <div class="p-4">
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <!-- Card Header -->
+                <div class="bg-red-50 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-red-100">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Confirm Delete</h3>
+                    <button wire:click="$set('confirmingDelete', false)" type="button" class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded-full p-1 transition-colors duration-200">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Card Content -->
+                <div class="p-6">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">Delete Confirmation</h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500">
+                                    @if($confirmDeleteType === 'gradingSystem')
+                                        Are you sure you want to delete this grading system? This action cannot be undone.
+                                    @else
+                                        Are you sure you want to delete this exam? This action cannot be undone.
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                        @if($confirmDeleteType === 'gradingSystem')
+                            <button wire:click="deleteGradingSystem" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200">
+                                Delete
+                            </button>
+                        @else
+                            <button wire:click="deleteExam" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200">
+                                Delete
+                            </button>
+                        @endif
+                        <button wire:click="$set('confirmingDelete', false)" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:w-auto sm:text-sm transition-colors duration-200">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Tab content -->
     <div class="py-4 px-6 bg-gray-50">
         @if($activeTab == 'exams')
             <div class="transition-all transform duration-300 ease-in-out">
@@ -104,21 +274,14 @@
     @endif
 </div>
 
-<!-- Modals -->
-@include('livewire.exams.partials.modals.exam-form')
-@include('livewire.exams.partials.modals.exam-details')
-@include('livewire.exams.partials.modals.grading-system-form')
-@include('livewire.exams.partials.modals.grading-system-details')
-@include('livewire.exams.partials.modals.confirm-delete')
-
 <!-- Initialize scripts -->
 <script>
-document.addEventListener('livewire:init', function () {
+document.addEventListener('livewire:initialized', function () {
     // Initialize tooltips on page load
     initializeTippy();
 
     // Listen for select2 initialization
-    Livewire.on('initializeSelect2', function () {
+    Livewire.on('initializeSelect2', () => {
         // Wait for DOM to update
         setTimeout(function() {
             // Initialize all select2 elements
@@ -145,9 +308,8 @@ document.addEventListener('livewire:init', function () {
         }, 200);
     });
 
-    // Listen for modal events
-    Livewire.on('modalOpened', function() {
-        // Re-initialize tooltips when modal opens
+    // Re-initialize tooltips when sections load or change
+    Livewire.on('contentChanged', () => {
         setTimeout(initializeTippy, 100);
     });
 });

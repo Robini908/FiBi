@@ -1,0 +1,1 @@
+<?php echo $__env->make('livewire.timetable.partials.time-slots', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?> <?php /**PATH C:\projects\MbukuErp\resources\views/livewire/timetable/time-slots.blade.php ENDPATH**/ ?>

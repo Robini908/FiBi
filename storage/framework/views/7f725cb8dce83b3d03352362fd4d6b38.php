@@ -178,6 +178,7 @@ unset($__params);
 unset($__split);
 if (isset($__slots)) unset($__slots);
 ?>
+       
         
         <?php elseif(Qs::isTeacher()): ?>
         <!-- Teacher's View -->

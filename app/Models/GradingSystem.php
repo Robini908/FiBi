@@ -23,10 +23,12 @@ class GradingSystem extends Model
         'pass_mark',
         'effective_date',
         'rules',
+        'is_active',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
+        'is_active' => 'boolean',
         'effective_date' => 'datetime',
     ];
 
@@ -51,5 +53,13 @@ class GradingSystem extends Model
     public function grades(): HasMany
     {
         return $this->hasMany(GradingGrade::class);
+    }
+    
+    /**
+     * Get the grade ranges for the grading system.
+     */
+    public function gradeRanges(): HasMany
+    {
+        return $this->hasMany(GradeRange::class);
     }
 }

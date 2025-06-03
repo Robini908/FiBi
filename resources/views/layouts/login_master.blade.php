@@ -116,7 +116,6 @@
     </main>
 
     @livewireScripts
-    @notificationScripts
     @stack('scripts')
 </body>
 

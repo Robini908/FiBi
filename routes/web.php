@@ -34,10 +34,7 @@ Route::get('/create-school/{name}', function ($name) {
 Route::middleware('auth')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     
-    // Wire Elements Modal Demo
-    Route::get('/modal-demo', function() {
-        return view('livewire.modal-demo');
-    })->name('modal.demo');
+   
 });
 
 Route::middleware('auth')->group(function () {
@@ -69,6 +66,11 @@ Route::group(['middleware' => ['auth', 'administrator_teacher']], function () {
     Route::get('/pages/support_team/exams/assign-exam-marks', function () {
         return view('pages.support_team.exams.assign-exam-marks');
     })->name('exams.assignExamMarks');
+
+    Route::get('/pages/support_team/exams/set', function () {
+        return view('pages.support_team.exams.set');
+    })->name('exams.set');
+    
     
     // New modern Google-inspired exam management system
     Route::get('/exams/modern-management', function () {
@@ -607,4 +609,32 @@ Route::get('/diagnostic', 'App\Http\Controllers\DiagnosticController@index')->na
 Route::get('/test-role-middleware', function () {
     return 'Role middleware is working correctly!';
 })->middleware('role:librarian,admin')->name('test.role.middleware');
+
+// Grading Systems Routes
+Route::prefix('exams')->name('exams.')->group(function() {
+    // Standard routes
+    Route::get('/grading-systems', [App\Http\Controllers\Exams\GradingSystemController::class, 'index'])->name('grading-systems.index');
+    
+    // Livewire routes - these must come before the show route to avoid conflicts
+    Route::get('/grading-systems/create', function() {
+        return view('exams.grading-systems.create');
+    })->name('grading-systems.create');
+    
+    // Show route - this must come after any specific routes with the same prefix
+    Route::get('/grading-systems/{gradingSystem}', [App\Http\Controllers\Exams\GradingSystemController::class, 'show'])->name('grading-systems.show');
+    
+    // Edit routes - these include the gradingSystem parameter
+    Route::get('/grading-systems/{gradingSystem}/edit', function($gradingSystem) {
+        return view('exams.grading-systems.edit', compact('gradingSystem'));
+    })->name('grading-systems.edit');
+    
+    // Grade Range routes
+    Route::get('/grading-systems/{gradingSystem}/ranges/edit', function($gradingSystem) {
+        return view('exams.grading-systems.ranges.edit', compact('gradingSystem'));
+    })->name('grading-systems.ranges.edit');
+    
+    Route::get('/grading-systems/{gradingSystem}/ranges/create', function($gradingSystem) {
+        return view('exams.grading-systems.ranges.create', compact('gradingSystem'));
+    })->name('grading-systems.ranges.create');
+});
 

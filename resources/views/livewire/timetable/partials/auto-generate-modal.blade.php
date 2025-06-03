@@ -1,35 +1,46 @@
 <!-- Auto-Generate Timetable Modal -->
 <div
-    x-data="{ 
+    x-data="{
         show: false,
         activeTab: 'subject',
         isLoading: true,
+        loadingTimeout: null,
         init() {
             // Listen for show/hide from Livewire
             $wire.$watch('showAutoGenerateModal', value => {
-                this.show = value;
-
+                // Only update show if it's being opened or explicitly closed
                 if (value === true) {
+                    this.show = true;
                     // Reset loading state when opening
                     this.isLoading = true;
-                    
+
+                    // Clear any existing timeout
+                    if (this.loadingTimeout) {
+                        clearTimeout(this.loadingTimeout);
+                    }
+
                     // Give time for data to load
-                    setTimeout(() => {
-                        if (this.show) {
-                            this.isLoading = false;
-                        }
+                    this.loadingTimeout = setTimeout(() => {
+                        this.isLoading = false;
                     }, 1000);
+                } else if (value === false) {
+                    // Only close if explicitly set to false
+                    this.show = false;
+                    // Clear any pending timeout
+                    if (this.loadingTimeout) {
+                        clearTimeout(this.loadingTimeout);
+                    }
                 }
             });
         }
     }"
     x-show="show"
     x-cloak
-    @keydown.escape.window="$wire.set('showAutoGenerateModal', false)"
+    @keydown.escape.window="!$wire.loading && $wire.set('showAutoGenerateModal', false)"
     class="relative z-50"
 >
     <!-- Fixed overlay backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" x-show="show" 
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" x-show="show"
          x-transition:enter="ease-out duration-300"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -46,22 +57,24 @@
                  x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                  x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
                  x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                  x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                  class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
-                
+
                 <!-- Close Button -->
                 <div class="absolute top-0 right-0 hidden pt-4 pr-4 sm:block z-10">
-                    <button type="button" 
-                        @click="$wire.set('showAutoGenerateModal', false)"
-                        class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                    <button type="button"
+                        @click="!$wire.loading && $wire.set('showAutoGenerateModal', false)"
+                        class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-50 cursor-not-allowed">
                         <span class="sr-only">Close</span>
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-            
+
                 <!-- Header -->
                 <div class="bg-white px-5 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <div class="sm:flex sm:items-start">
@@ -87,9 +100,9 @@
                 <div x-show="!isLoading" class="bg-gray-50 border-t border-b border-gray-200">
                     <div class="px-4 py-2">
                         <nav class="flex space-x-4">
-                            <button 
+                            <button
                                 type="button"
-                                @click="activeTab = 'basic'" 
+                                @click="activeTab = 'basic'"
                                 :class="{'px-4 py-2 text-sm font-medium rounded-md flex items-center transition-colors duration-200': true,
                                         'bg-green-100 text-green-700': activeTab === 'basic',
                                         'text-gray-500 hover:text-gray-700 hover:bg-gray-100': activeTab !== 'basic'}"
@@ -100,9 +113,9 @@
                                 </svg>
                                 Basic Settings
                             </button>
-                            <button 
+                            <button
                                 type="button"
-                                @click="activeTab = 'subject'" 
+                                @click="activeTab = 'subject'"
                                 :class="{'px-4 py-2 text-sm font-medium rounded-md flex items-center transition-colors duration-200': true,
                                         'bg-green-100 text-green-700': activeTab === 'subject',
                                         'text-gray-500 hover:text-gray-700 hover:bg-gray-100': activeTab !== 'subject'}"
@@ -112,9 +125,9 @@
                                 </svg>
                                 Subject Preferences
                             </button>
-                            <button 
+                            <button
                                 type="button"
-                                @click="activeTab = 'advanced'" 
+                                @click="activeTab = 'advanced'"
                                 :class="{'px-4 py-2 text-sm font-medium rounded-md flex items-center transition-colors duration-200': true,
                                         'bg-green-100 text-green-700': activeTab === 'advanced',
                                         'text-gray-500 hover:text-gray-700 hover:bg-gray-100': activeTab !== 'advanced'}"
@@ -127,11 +140,11 @@
                         </nav>
                     </div>
                 </div>
-                
+
                 <div class="bg-white px-5 pb-5 max-h-[70vh] overflow-y-auto">
                     <!-- Loading Spinner -->
-                    <div 
-                        x-show="isLoading" 
+                    <div
+                        x-show="isLoading"
                         class="flex flex-col items-center justify-center py-12"
                     >
                         <svg class="animate-spin h-12 w-12 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -141,7 +154,7 @@
                         <p class="mt-3 text-gray-600 text-sm font-medium">Loading timetable data...</p>
                         <p class="text-xs text-gray-400 mt-1">This may take a moment</p>
                     </div>
-                    
+
                     <!-- Form content (hidden until fully loaded) -->
                     <div x-show="!isLoading" x-cloak>
                         <form wire:submit.prevent="autoGenerateTimetable">
@@ -149,17 +162,17 @@
                             <div x-show="activeTab === 'basic'" x-transition>
                                 @include('livewire.timetable.partials.auto-generate-modal-basic-settings')
                             </div>
-                            
+
                             <!-- Subject Preferences Tab (from partial) -->
                             <div x-show="activeTab === 'subject'" x-transition>
                                 @include('livewire.timetable.partials.auto-generate-modal-subject-preferences')
                             </div>
-                            
+
                             <!-- Advanced Options Tab (from partial) -->
                             <div x-show="activeTab === 'advanced'" x-transition>
                                 @include('livewire.timetable.partials.auto-generate-modal-advanced')
                             </div>
-                            
+
                             <!-- Action Buttons -->
                             <div class="px-5 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between mt-4 -mx-5 rounded-b-lg">
                                 <div>
@@ -168,19 +181,32 @@
                                     </p>
                                 </div>
                                 <div class="flex gap-3">
-                                    <button type="button" 
-                                        @click="$wire.set('showAutoGenerateModal', false)"
+                                    <button type="button"
+                                        @click="!$wire.loading && $wire.set('showAutoGenerateModal', false)"
                                         class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                        wire:loading.attr="disabled"
+                                        wire:loading.class="opacity-50 cursor-not-allowed"
                                     >
                                         Cancel
                                     </button>
-                                    <button type="submit" 
+                                    <button type="submit"
                                         class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                        wire:loading.attr="disabled"
+                                        wire:loading.class="opacity-75 cursor-not-allowed"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                        </svg>
-                                        Generate Timetable
+                                        <span wire:loading.remove>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                            </svg>
+                                            Generate Timetable
+                                        </span>
+                                        <span wire:loading>
+                                            <svg class="animate-spin h-5 w-5 mr-1.5 -ml-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                        </span>
                                     </button>
                                 </div>
                             </div>
@@ -190,4 +216,4 @@
             </div>
         </div>
     </div>
-</div> 
+</div>

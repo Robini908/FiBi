@@ -1,4 +1,4 @@
-<div x-data="{ 
+<div x-data="{
     showForm: @entangle('showForm').live,
     showNewCategoryForm: @entangle('showNewCategoryForm').live,
     showDeleteConfirm: false,
@@ -6,26 +6,26 @@
     showSuccessMessage: false,
     successMessage: '',
     showHelpPanel: false
-}" class="bg-white rounded-lg shadow-sm overflow-hidden">
+}" class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden border border-secondary-100">
 
     <!-- Help Panel -->
-    <div x-show="showHelpPanel" 
+    <div x-show="showHelpPanel"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 transform -translate-y-2"
          x-transition:enter-end="opacity-100 transform translate-y-0"
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100 transform translate-y-0"
          x-transition:leave-end="opacity-0 transform -translate-y-2"
-         class="bg-gradient-to-r from-indigo-50 to-blue-50 px-6 py-4 border-b border-indigo-100 mb-4">
+         class="bg-gradient-to-r from-primary-50 to-secondary-50 px-6 py-4 border-b border-primary-100 mb-4">
         <div class="flex">
             <div class="flex-shrink-0">
-                <svg class="h-6 w-6 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg class="h-6 w-6 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
         </div>
             <div class="ml-3">
-                <h3 class="text-sm font-medium text-indigo-800">Subject Management Help</h3>
-                <div class="mt-2 text-sm text-indigo-700">
+                <h3 class="text-sm font-medium text-primary-800">Subject Management Help</h3>
+                <div class="mt-2 text-sm text-primary-700">
                     <ul class="list-disc pl-5 space-y-1">
                         <li>Create new subjects by clicking the "New Subject" button</li>
                         <li>Filter subjects by category using the dropdown</li>
@@ -34,7 +34,7 @@
                     </ul>
                 </div>
                 <div class="mt-3">
-                    <button @click="showHelpPanel = false" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                    <button @click="showHelpPanel = false" class="text-sm font-medium text-primary-600 hover:text-primary-500 transition-colors duration-150">
                         Dismiss
                     </button>
                 </div>
@@ -43,7 +43,7 @@
                 </div>
 
     <!-- Success Message Toast -->
-    <div x-show="showSuccessMessage" 
+    <div x-show="showSuccessMessage"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 transform translate-y-2"
          x-transition:enter-end="opacity-100 transform translate-y-0"
@@ -84,32 +84,32 @@
                                                         @endif
 
     <!-- Delete Confirmation Modal -->
-    <div x-show="showDeleteConfirm" 
+    <div x-show="showDeleteConfirm"
          x-cloak
-         class="fixed z-10 inset-0 overflow-y-auto" 
-         aria-labelledby="modal-title" 
-         role="dialog" 
+         class="fixed z-10 inset-0 overflow-y-auto"
+         aria-labelledby="modal-title"
+         role="dialog"
          aria-modal="true">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <!-- Background overlay -->
-            <div x-show="showDeleteConfirm" 
-                 x-transition:enter="ease-out duration-300" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="ease-in duration-200" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+            <div x-show="showDeleteConfirm"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
                  aria-hidden="true"></div>
 
             <!-- Modal panel -->
-            <div x-show="showDeleteConfirm" 
-                 x-transition:enter="ease-out duration-300" 
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
-                 x-transition:leave="ease-in duration-200" 
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+            <div x-show="showDeleteConfirm"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                  class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <div class="sm:flex sm:items-start">
@@ -131,13 +131,13 @@
                     </div>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="button" 
+                    <button type="button"
                             @click="$wire.delete(subjectToDelete); showDeleteConfirm = false; subjectToDelete = null"
                             class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
                         Delete
                     </button>
-                    <button type="button" 
-                            @click="showDeleteConfirm = false; subjectToDelete = null" 
+                    <button type="button"
+                            @click="showDeleteConfirm = false; subjectToDelete = null"
                             class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
                         Cancel
                     </button>

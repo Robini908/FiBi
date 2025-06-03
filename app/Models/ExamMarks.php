@@ -78,9 +78,10 @@ class ExamMarks extends Model
     public static function getSpecialGrades()
     {
         return [
-            'X' => 'Absence from the exam or a significant portion of it.',
-            'Y' => 'Cancellation of results due to exam malpractice or irregularity.',
-            'Z' => 'Nullification of the candidate\'s entire results for severe misconduct or violation of exam regulations.',
+            'AB' => 'Absent from the exam or a significant portion of it.',
+            'EX' => 'Exempted from the exam for valid reasons.',
+            'P' => 'Pass without specific marks.',
+            'F' => 'Fail without specific marks.',
         ];
     }
 
@@ -94,7 +95,7 @@ class ExamMarks extends Model
             'exam_id' => 'required|exists:exams,id',
             'subject_id' => 'required|exists:subjects,id',
             'marks' => 'nullable|numeric|min:0|max:100',
-            'special_grade' => 'nullable|in:X,Y,Z',
+            'special_grade' => 'nullable|in:AB,EX,P,F',
         ];
     }
 

@@ -44,7 +44,6 @@ class AssignExamsSubjectwise extends Component
     public $selectedClassName; // Holds the selected class name
     public $editingSpecialGradeId = null;
 
-
     public $filterSection;
 
     protected $rules = [
@@ -68,12 +67,22 @@ class AssignExamsSubjectwise extends Component
         $this->selectedSubject = null;
     }
 
-    
-
-    public function isStudentEnrolledInSubject($studentId, $subjectId)
+    /**
+     * Determine if a student is enrolled in a subject
+     * 
+     * @param int $studentId The student record ID
+     * @param int|null $subjectId The subject ID
+     * @return bool Whether the student is enrolled in the subject
+     */
+    public function isStudentEnrolledInSubject($studentId, $subjectId = null)
     {
+        // If no subject is selected, all students are considered enrolled
+        if (!$subjectId) {
+            return true;
+        }
+        
         // First check if subject selection is enabled for the class
-        $isSelectionEnabled = SubjectSelectionSetting::where('class_id', $this->selectedClass)
+        $isSelectionEnabled = SubjectSelectionSetting::where('zclass_id', $this->selectedClass)
             ->where('is_subject_selection_enabled', true)
             ->exists();
 
@@ -89,8 +98,15 @@ class AssignExamsSubjectwise extends Component
             ->exists();
     }
 
+    /**
+     * Check if subject selection is enabled for a class
+     */
     public function isSubjectSelectionEnabled($classId)
     {
+        if (!$classId) {
+            return false;
+        }
+        
         $class = MyClass::find($classId);
         return $class?->subjectSelectionSetting?->is_subject_selection_enabled ?? false;
     }
@@ -113,6 +129,7 @@ class AssignExamsSubjectwise extends Component
 
     public function render()
     {
+        try {
         $classes = MyClass::all();
         $exams = $this->selectedClass
             ? Exam::where('class_id', $this->selectedClass)->get()
@@ -136,7 +153,7 @@ class AssignExamsSubjectwise extends Component
                     if ($this->selectedSubject) {
                         request()->merge(['subject_id' => $this->selectedSubject]);
                         $section->enrolled_count = StudentRecord::where('section_id', $section->id)
-            ->where('my_class_id', $this->selectedClass)
+                            ->where('my_class_id', $this->selectedClass)
                             ->get()
                             ->filter(function ($student) {
                                 return $student->is_enrolled;
@@ -154,16 +171,25 @@ class AssignExamsSubjectwise extends Component
         }
 
         // Fetch students with their relationships
-        if ($this->selectedSection) {
-            request()->merge(['subject_id' => $this->selectedSubject]);
+        if ($this->selectedSection && $this->selectedClass) {
+            if ($this->selectedSubject) {
+                request()->merge(['subject_id' => $this->selectedSubject]);
+            }
+            
             $this->students = StudentRecord::with(['user', 'subjects'])
-            ->where('section_id', $this->selectedSection)
+                ->where('section_id', $this->selectedSection)
                 ->where('my_class_id', $this->selectedClass)
                 ->get()
-                ->sortBy(function ($student) {
-                    return [!$student->is_enrolled, $student->adm_no];
-                })
                 ->values();
+
+            // Sort students - enrolled first, then by admission number
+            if ($this->selectedSubject) {
+                $this->students = $this->students->sortBy(function ($student) {
+                    return [!$student->is_enrolled, $student->adm_no];
+                })->values();
+            } else {
+                $this->students = $this->students->sortBy('adm_no')->values();
+            }
 
             $this->populateMarksArray();
         } else {
@@ -174,11 +200,16 @@ class AssignExamsSubjectwise extends Component
             ? Exam::find($this->selectedExam)->name
             : null;
 
+            if ($this->selectedSubject) {
+                $subject = Subject::find($this->selectedSubject);
+                $this->selectedSubjectName = $subject ? $subject->subject_name : 'Unknown Subject';
+            }
+
         $this->assignedMarks = ($this->selectedExam && $this->selectedSubject)
             ? ExamMarks::where('exam_id', $this->selectedExam)
-            ->where('subject_id', $this->selectedSubject)
-            ->with('student.user')
-            ->get()
+                ->where('subject_id', $this->selectedSubject)
+                ->with('student.user')
+                ->get()
             : collect();
 
         return view('livewire.assign-exams-subjectwise', [
@@ -190,10 +221,27 @@ class AssignExamsSubjectwise extends Component
             'selectedExamName' => $this->selectedExamName,
             'selectedSubjectName' => $this->selectedSubjectName,
         ]);
+        } catch (\Exception $e) {
+            Log::error('Error in AssignExamsSubjectwise render: ' . $e->getMessage());
+            $this->alert('error', 'An error occurred while loading data. Please try again or contact support.');
+            return view('livewire.assign-exams-subjectwise', [
+                'classes' => collect(),
+                'exams' => collect(),
+                'subjects' => collect(),
+                'sections' => collect(),
+                'assignedMarksForTable' => collect(),
+                'selectedExamName' => null,
+                'selectedSubjectName' => null,
+            ]);
+        }
     }
 
+    /**
+     * Populate the marks and special grades arrays from assigned marks
+     */
     public function populateMarksArray()
     {
+        try {
         foreach ($this->students as $student) {
             $assignedMark = $this->assignedMarks->firstWhere('student_id', $student->id);
             if ($assignedMark) {
@@ -208,6 +256,10 @@ class AssignExamsSubjectwise extends Component
                 $this->marks[$student->id] = null;
                 $this->specialGrades[$student->id] = null;
             }
+            }
+        } catch (\Exception $e) {
+            Log::error('Error populating marks array: ' . $e->getMessage());
+            $this->alert('error', 'Failed to load student marks. Please try again.');
         }
     }
 
@@ -228,19 +280,24 @@ class AssignExamsSubjectwise extends Component
 
     public function updatedSelectedSection($sectionId)
     {
-        if ($sectionId) {
+        if ($sectionId && $this->selectedClass) {
+            if ($this->selectedSubject) {
+                request()->merge(['subject_id' => $this->selectedSubject]);
+            }
+            
             $this->students = StudentRecord::with(['user', 'subjects'])
                 ->where('section_id', $sectionId)
                 ->where('my_class_id', $this->selectedClass)
-                ->get()
-                ->map(function ($student) {
-                    $student->is_enrolled = $this->isStudentEnrolledInSubject($student->id, $this->selectedSubject);
-                    return $student;
-                })
-                ->sortBy(function ($student) {
+                ->get();
+
+            // Sort students appropriately
+            if ($this->selectedSubject) {
+                $this->students = $this->students->sortBy(function ($student) {
                     return [!$student->is_enrolled, $student->adm_no];
-                })
-                ->values();
+                })->values();
+            } else {
+                $this->students = $this->students->sortBy('adm_no')->values();
+            }
 
             $this->populateMarksArray();
         } else {
@@ -250,27 +307,40 @@ class AssignExamsSubjectwise extends Component
 
     protected function getStudents()
     {
-        if (!$this->selectedSection) {
+        if (!$this->selectedSection || !$this->selectedClass) {
             return collect();
         }
 
-        return StudentRecord::with(['user', 'subjects'])
+        if ($this->selectedSubject) {
+            request()->merge(['subject_id' => $this->selectedSubject]);
+        }
+
+        $students = StudentRecord::with(['user', 'subjects'])
             ->where('section_id', $this->selectedSection)
             ->where('my_class_id', $this->selectedClass)
-            ->get()
-        ->map(function ($student) {
-            $student->is_enrolled = $this->isStudentEnrolledInSubject($student->id, $this->selectedSubject);
-            return $student;
-        })
-        ->sortBy(function ($student) {
-            return [!$student->is_enrolled, $student->adm_no];
-        })
-        ->values();
+            ->get();
+
+        // Sort students appropriately
+        if ($this->selectedSubject) {
+            $students = $students->sortBy(function ($student) {
+                return [!$student->is_enrolled, $student->adm_no];
+            })->values();
+        } else {
+            $students = $students->sortBy('adm_no')->values();
+        }
+
+        return $students;
     }
 
     public function updatedSelectedSubject($subjectId)
     {
-        $this->reset(['students', 'marks', 'specialGrades', 'selectedSection']);
+        if ($this->selectedSection && $subjectId) {
+            // Refresh students to apply the new subject filter
+            request()->merge(['subject_id' => $subjectId]);
+            $this->students = $this->getStudents();
+        }
+
+        $this->reset(['marks', 'specialGrades']);
 
         if ($subjectId) {
             $subject = Subject::find($subjectId);
@@ -280,8 +350,15 @@ class AssignExamsSubjectwise extends Component
         }
     }
 
+    /**
+     * Save the mark for a given student
+     *
+     * @param int $studentId
+     * @return void
+     */
     public function saveMark($studentId)
     {
+        try {
         $this->validateOnly("marks.{$studentId}");
         
         // Clear any special grade when saving a numeric mark
@@ -290,12 +367,12 @@ class AssignExamsSubjectwise extends Component
             
             // Save to database
             ExamMarks::updateOrCreate(
-                        [
-                            'student_id' => $studentId,
-                            'exam_id' => $this->selectedExam,
-                            'subject_id' => $this->selectedSubject,
-                        ],
-                        [
+                [
+                    'student_id' => $studentId,
+                    'exam_id' => $this->selectedExam,
+                    'subject_id' => $this->selectedSubject,
+                ],
+                [
                     'marks' => $this->marks[$studentId],
                     'special_grade' => null,
                 ]
@@ -305,12 +382,26 @@ class AssignExamsSubjectwise extends Component
             $this->refreshMarksData();
             
             $this->dispatch('mark-saved', studentId: $studentId);
+            $this->alert('success', 'Mark saved successfully');
+            }
+        } catch (\Exception $e) {
+            Log::error('Error saving mark: ' . $e->getMessage());
+            $this->alert('error', 'Failed to save mark: ' . $e->getMessage());
         }
     }
 
+    /**
+     * Assign a special grade to a student
+     *
+     * @param string $grade
+     * @param int $studentId
+     * @return void
+     */
     public function assignSpecialGrade($grade, $studentId)
     {
+        try {
         if (!in_array($grade, ['AB', 'EX', 'P', 'F'])) {
+                $this->alert('error', 'Invalid special grade');
             return;
         }
 
@@ -335,10 +426,22 @@ class AssignExamsSubjectwise extends Component
         $this->refreshMarksData();
 
         $this->dispatch('mark-saved', studentId: $studentId);
+        $this->alert('success', 'Special grade assigned successfully');
+        } catch (\Exception $e) {
+            Log::error('Error assigning special grade: ' . $e->getMessage());
+            $this->alert('error', 'Failed to assign special grade: ' . $e->getMessage());
+        }
     }
 
+    /**
+     * Clear a mark for a student
+     *
+     * @param int $studentId
+     * @return void
+     */
     public function clearMark($studentId)
     {
+        try {
         $this->marks[$studentId] = null;
         $this->specialGrades[$studentId] = null;
 
@@ -352,16 +455,34 @@ class AssignExamsSubjectwise extends Component
         $this->refreshMarksData();
 
         $this->dispatch('mark-saved', studentId: $studentId);
+        $this->alert('success', 'Mark cleared successfully');
+        } catch (\Exception $e) {
+            Log::error('Error clearing mark: ' . $e->getMessage());
+            $this->alert('error', 'Failed to clear mark: ' . $e->getMessage());
+        }
     }
 
+    /**
+     * Refresh marks for all students
+     */
     public function refreshMarks()
     {
+        try {
         // Refresh the marks data
         $this->refreshMarksData();
+            $this->alert('success', 'Marks refreshed successfully');
+        } catch (\Exception $e) {
+            Log::error('Error refreshing marks: ' . $e->getMessage());
+            $this->alert('error', 'Failed to refresh marks: ' . $e->getMessage());
+        }
     }
 
+    /**
+     * Refresh marks data from the database
+     */
     protected function refreshMarksData()
     {
+        try {
         // Fetch latest marks from database
         $latestMarks = ExamMarks::where('exam_id', $this->selectedExam)
             ->where('subject_id', $this->selectedSubject)
@@ -380,21 +501,40 @@ class AssignExamsSubjectwise extends Component
             }
         }
 
+        // Update the assigned marks collection
+        $this->assignedMarks = $latestMarks;
+
         // Dispatch event for UI update
         $this->dispatch('marks-updated');
+        } catch (\Exception $e) {
+            Log::error('Error refreshing marks data: ' . $e->getMessage());
+            throw $e;
+        }
     }
 
+    /**
+     * Assign marks to all students in the current view
+     */
     public function assignMarks()
     {
+        try {
         $this->validate();
 
+        $successCount = 0;
+
         foreach ($this->students as $student) {
-            if (!$student->is_enrolled) {
+            // Skip students who aren't enrolled in the subject (if subject selection is enabled)
+            if ($this->selectedSubject && !$student->is_enrolled) {
                 continue;
             }
 
             $mark = $this->marks[$student->id] ?? null;
             $specialGrade = $this->specialGrades[$student->id] ?? null;
+
+            // Skip if neither mark nor special grade is set
+            if (is_null($mark) && is_null($specialGrade)) {
+                continue;
+            }
 
             // Ensure mutual exclusivity
             if ($mark && $specialGrade) {
@@ -411,13 +551,24 @@ class AssignExamsSubjectwise extends Component
             $examMark->marks = $mark;
             $examMark->special_grade = $specialGrade;
             $examMark->save();
+            
+            $successCount++;
         }
 
         // Refresh the marks data after bulk save
         $this->refreshMarksData();
 
         $this->dispatch('marks-assigned');
-        session()->flash('success', 'Marks assigned successfully!');
+        
+        if ($successCount > 0) {
+            $this->alert('success', "$successCount marks assigned successfully!");
+        } else {
+            $this->alert('info', "No marks were assigned. Make sure marks or special grades are entered for at least one student.");
+            }
+        } catch (\Exception $e) {
+            Log::error('Error assigning marks: ' . $e->getMessage());
+            $this->alert('error', 'Failed to assign marks: ' . $e->getMessage());
+        }
     }
 
     public function editMark($studentId)
@@ -436,11 +587,17 @@ class AssignExamsSubjectwise extends Component
         }
     }
 
+    /**
+     * Update mark for a student
+     * 
+     * @param int $studentId The student ID to update marks for
+     */
     public function updateMark($studentId)
     {
+        try {
         $this->validate([
             "marks.$studentId" => 'nullable|numeric|min:0|max:100',
-            "specialGrades.$studentId" => 'nullable|in:X,Y,Z',
+            "specialGrades.$studentId" => 'nullable|in:AB,EX,P,F',
         ]);
 
         // Ensure either marks or special grade is provided, but not both
@@ -449,6 +606,7 @@ class AssignExamsSubjectwise extends Component
             return;
         }
 
+            // Update or create the mark
         ExamMarks::updateOrCreate(
             [
                 'student_id' => $studentId,
@@ -456,13 +614,55 @@ class AssignExamsSubjectwise extends Component
                 'subject_id' => $this->selectedSubject,
             ],
             [
-                'marks' => $this->marks[$studentId],
-                'special_grade' => $this->specialGrades[$studentId],
+                    'marks' => $this->marks[$studentId] ?? null,
+                    'special_grade' => $this->specialGrades[$studentId] ?? null,
             ]
         );
 
         $this->editingMarkId = null;
-        $this->refreshAssignedMarks();
+        $this->refreshMarksData();
         $this->alert('success', 'Marks/Grade updated successfully.');
+        } catch (\Exception $e) {
+            Log::error('Error updating mark: ' . $e->getMessage());
+            $this->alert('error', 'Failed to update mark: ' . $e->getMessage());
+        }
+    }
+    
+    // Added missing method
+    public function refreshAssignedMarks()
+    {
+        $this->assignedMarks = ExamMarks::where('exam_id', $this->selectedExam)
+            ->where('subject_id', $this->selectedSubject)
+            ->with('student.user')
+            ->get();
+    }
+
+    /**
+     * Reset all filters and selections
+     * 
+     * @return void
+     */
+    public function resetFilters()
+    {
+        $this->reset([
+            'selectedClass',
+            'selectedExam',
+            'selectedExamName',
+            'selectedSubject',
+            'selectedSubjectName',
+            'selectedSection',
+            'selectedClassName',
+            'students',
+            'marks',
+            'specialGrades',
+            'assignedMarks',
+            'editingMarkId',
+            'editingSpecialGradeId'
+        ]);
+        
+        $this->students = collect();
+        $this->assignedMarks = collect();
+        
+        $this->alert('info', 'All filters have been reset. You can start over.');
     }
 }
