@@ -33,10 +33,7 @@
                                             <div class="text-xs text-gray-500">
                                                 ID: <?php echo e($classId); ?>
 
-                                                <!--[if BLOCK]><![endif]--><?php if(!empty($classData['class']->section)): ?>
-                                                    <br>Section: <?php echo e($classData['class']->section->name); ?>
-
-                                                <?php endif; ?><!--[if ENDBLOCK]><![endif]-->
+                                                
                                             </div>
                                         </td>
                                     <?php endif; ?><!--[if ENDBLOCK]><![endif]-->

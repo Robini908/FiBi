@@ -21,7 +21,9 @@ class TimetablePeriod extends Model
         'start_time',
         'end_time',
         'period_name',
-        'period_order',
+        'updated_at',
+        'period_order'
+        ,
     ];
 
     /**

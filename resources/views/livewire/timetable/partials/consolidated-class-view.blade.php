@@ -31,9 +31,9 @@
                                             <div class="font-bold">{{ $classData['class']->name }}</div>
                                             <div class="text-xs text-gray-500">
                                                 ID: {{ $classId }}
-                                                @if(!empty($classData['class']->section))
+                                                {{-- @if(!empty($classData['class']->section))
                                                     <br>Section: {{ $classData['class']->section->name }}
-                                                @endif
+                                                @endif --}}
                                             </div>
                                         </td>
                                     @endif

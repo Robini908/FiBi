@@ -593,14 +593,13 @@ class AttendanceController extends Controller
                     $detail->time_in,
                     $detail->minutes_late > 0 ? $detail->minutes_late : '',
                     $detail->remarks,
-                ];
+                ];z
                 
                 fputcsv($file, $row);
             }
             
             fclose($file);
         };
-        
         return response()->stream($callback, 200, $headers);
     }
 } 
